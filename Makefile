@@ -1,9 +1,10 @@
 all:	pcsensor
 
-CFLAGS = -O2 -Wall
+CC = gcc
+CFLAGS = -g -O2 -Wall -lusb-1.0 -I/usr/include/libusb-1.0
 
 pcsensor:	pcsensor.c
-	${CC} -DUNIT_TEST -o $@ $^ -lusb
+	${CC} ${CFLAGS} -DUNIT_TEST -o $@ $^
 
 clean:		
 	rm -f pcsensor *.o

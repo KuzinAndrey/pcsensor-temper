@@ -1,3 +1,38 @@
+PCSensor / TEMPer2 driver for Linux/Solaris 
+====
+
+![TEMPer](images/New_TEMPer_6.jpg)
+
+# Build
+## Solaris 11
+```
+# pkg install gcc libusb-1
+$ make
+...
+```
+
+## RHEL
+```
+# yum install gcc libusb1-devel
+$ make
+...
+```
+
+# Usage
+```
+$ sudo ./pcsensor
+2017/08/30 17:21:35
+Temperature (internal) 96.58F 35.88C
+Temperature (external) 214.60F 101.45C
+```
+
+libusb_detach_kernel_driver does not seem to work on Solaris. Thus, it looks necessary to unload hid driver manually.
+Are there any better solutions? (See pcsensor.sh)
+
+
+Original document below
+====
+
 pcsensor
 ========
 

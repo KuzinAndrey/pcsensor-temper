@@ -28,17 +28,16 @@
  */
 
 
-
-#include <usb.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <time.h>
-
-#include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <signal.h>
+#include <libusb.h>
 
-
-#define VERSION "1.0.1"
+#define VERSION "1.0.1a"
 
 #define VENDOR_ID  0x0c45
 #define PRODUCT_ID 0x7401
@@ -71,13 +70,13 @@ void bad(const char *why) {
         exit(17);
 }
 
+libusb_context *ctx = NULL;
+libusb_device_handle *find_lvr_winusb();
 
-usb_dev_handle *find_lvr_winusb();
-
-void usb_detach(usb_dev_handle *lvr_winusb, int iInterface) {
+void usb_detach(libusb_device_handle *lvr_winusb, int iInterface) {
         int ret;
 
-	ret = usb_detach_kernel_driver_np(lvr_winusb, iInterface);
+	ret = libusb_detach_kernel_driver(lvr_winusb, iInterface);
 	if(ret) {
 		if(errno == ENODATA) {
 			if(debug) {
@@ -97,18 +96,16 @@ void usb_detach(usb_dev_handle *lvr_winusb, int iInterface) {
 	}
 }
 
-usb_dev_handle* setup_libusb_access() {
-     usb_dev_handle *lvr_winusb;
+libusb_device_handle* setup_libusb_access() {
+     libusb_device_handle *lvr_winusb;
+
+     libusb_init(&ctx);
 
      if(debug) {
-        usb_set_debug(255);
+        libusb_set_debug(ctx, 4); //LIBUSB_LOG_LEVEL_DEBUG
      } else {
-        usb_set_debug(0);
+        libusb_set_debug(ctx, 0); //LIBUSB_LOG_LEVEL_NONE
      }
-     usb_init();
-     usb_find_busses();
-     usb_find_devices();
-
 
      if(!(lvr_winusb = find_lvr_winusb())) {
                 printf("Couldn't find the USB device, Exiting\n");
@@ -122,20 +119,21 @@ usb_dev_handle* setup_libusb_access() {
         usb_detach(lvr_winusb, INTERFACE2);
 
 
-        if (usb_set_configuration(lvr_winusb, 0x01) < 0) {
+        if (libusb_set_configuration(lvr_winusb, 0x01) < 0) {
                 printf("Could not set configuration 1\n");
                 return NULL;
         }
 
 
         // Microdia tiene 2 interfaces
-        if (usb_claim_interface(lvr_winusb, INTERFACE1) < 0) {
-                printf("Could not claim interface\n");
+        int errno;
+        if ( ( errno = libusb_claim_interface(lvr_winusb, INTERFACE1) ) != 0) {
+                printf("Could not claim interface. Error:%d\n", errno);
                 return NULL;
         }
 
-        if (usb_claim_interface(lvr_winusb, INTERFACE2) < 0) {
-                printf("Could not claim interface\n");
+        if ( ( errno = libusb_claim_interface(lvr_winusb, INTERFACE2) ) != 0) {
+                printf("Could not claim interface. Error:%d\n", errno);
                 return NULL;
         }
 
@@ -144,38 +142,24 @@ usb_dev_handle* setup_libusb_access() {
 
 
 
-usb_dev_handle *find_lvr_winusb() {
+libusb_device_handle *find_lvr_winusb() {
+        libusb_device_handle *handle;
 
-     struct usb_bus *bus;
-        struct usb_device *dev;
-
-        for (bus = usb_busses; bus; bus = bus->next) {
-        for (dev = bus->devices; dev; dev = dev->next) {
-                        if (dev->descriptor.idVendor == VENDOR_ID &&
-                                dev->descriptor.idProduct == PRODUCT_ID ) {
-                                usb_dev_handle *handle;
-                                if(debug) {
-                                  printf("lvr_winusb with Vendor Id: %x and Product Id: %x found.\n", VENDOR_ID, PRODUCT_ID);
-                                }
-
-                                if (!(handle = usb_open(dev))) {
-                                        printf("Could not open USB device\n");
-                                        return NULL;
-                                }
-                                return handle;
-                        }
-                }
+        handle = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
+        if (!handle) {
+                printf("Could not open USB device\n");
+                return NULL;
         }
-        return NULL;
+        return handle;
 }
 
 
-void ini_control_transfer(usb_dev_handle *dev) {
+void ini_control_transfer(libusb_device_handle *dev) {
     int r,i;
 
     char question[] = { 0x01,0x01 };
 
-    r = usb_control_msg(dev, 0x21, 0x09, 0x0201, 0x00, (char *) question, 2, timeout);
+    r = libusb_control_transfer(dev, 0x21, 0x09, 0x0201, 0x00, (char *) question, 2, timeout);
     if( r < 0 )
     {
           perror("USB control write"); bad("USB write failed");
@@ -188,14 +172,14 @@ void ini_control_transfer(usb_dev_handle *dev) {
     }
 }
 
-void control_transfer(usb_dev_handle *dev, const char *pquestion) {
+void control_transfer(libusb_device_handle *dev, const char *pquestion) {
     int r,i;
 
     char question[reqIntLen];
 
     memcpy(question, pquestion, sizeof question);
 
-    r = usb_control_msg(dev, 0x21, 0x09, 0x0200, 0x01, (char *) question, reqIntLen, timeout);
+    r = libusb_control_transfer(dev, 0x21, 0x09, 0x0200, 0x01, (char *) question, reqIntLen, timeout);
     if( r < 0 )
     {
           perror("USB control write"); bad("USB write failed");
@@ -207,20 +191,23 @@ void control_transfer(usb_dev_handle *dev, const char *pquestion) {
     }
 }
 
-void interrupt_transfer(usb_dev_handle *dev) {
+void interrupt_transfer(libusb_device_handle *dev) {
 
-    int r,i;
+    int r,s,i;
     char answer[reqIntLen];
     char question[reqIntLen];
+    int transferred;
     for (i=0;i<reqIntLen; i++) question[i]=i;
-    r = usb_interrupt_write(dev, endpoint_Int_out, question, reqIntLen, timeout);
+    s = libusb_interrupt_transfer(dev, endpoint_Int_out, question, reqIntLen, &r, timeout);
     if( r < 0 )
     {
+          printf("USB write failed:%d", s);
           perror("USB interrupt write"); bad("USB write failed");
     }
-    r = usb_interrupt_read(dev, endpoint_Int_in, answer, reqIntLen, timeout);
+    s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
     if( r != reqIntLen )
     {
+          printf("USB read failed:%d", s);
           perror("USB interrupt read"); bad("USB read failed");
     }
 
@@ -228,18 +215,19 @@ void interrupt_transfer(usb_dev_handle *dev) {
        for (i=0;i<reqIntLen; i++) printf("%i, %i, \n",question[i],answer[i]);
     }
 
-    usb_release_interface(dev, 0);
+    libusb_release_interface(dev, 0);
 }
 
-void interrupt_read(usb_dev_handle *dev) {
+void interrupt_read(libusb_device_handle *dev) {
 
-    int r,i;
+    int r,s,i;
     unsigned char answer[reqIntLen];
     bzero(answer, reqIntLen);
 
-    r = usb_interrupt_read(dev, 0x82, answer, reqIntLen, timeout);
+    s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
     if( r != reqIntLen )
     {
+          printf("USB read failed: %d\n", s);
           perror("USB interrupt read"); bad("USB read failed");
     }
 
@@ -250,15 +238,16 @@ void interrupt_read(usb_dev_handle *dev) {
     }
 }
 
-void interrupt_read_temperatura(usb_dev_handle *dev, float *tempInC, float *tempOutC) {
+void interrupt_read_temperatura(libusb_device_handle *dev, float *tempInC, float *tempOutC) {
 
-    int r,i, temperature;
+    int r,s,i, temperature;
     unsigned char answer[reqIntLen];
     bzero(answer, reqIntLen);
 
-    r = usb_interrupt_read(dev, 0x82, answer, reqIntLen, timeout);
+    s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
     if( r != reqIntLen )
     {
+          printf("USB read failed: %d\n", s);
           perror("USB interrupt read"); bad("USB read failed");
     }
 
@@ -279,17 +268,17 @@ void interrupt_read_temperatura(usb_dev_handle *dev, float *tempInC, float *temp
 
 }
 
-void bulk_transfer(usb_dev_handle *dev) {
+void bulk_transfer(libusb_device_handle *dev) {
 
-    int r,i;
+    int r,s,i;
     char answer[reqBulkLen];
 
-    r = usb_bulk_write(dev, endpoint_Bulk_out, NULL, 0, timeout);
+    s = libusb_bulk_transfer(dev, endpoint_Bulk_out, NULL, 0, &r, timeout);
     if( r < 0 )
     {
           perror("USB bulk write"); bad("USB write failed");
     }
-    r = usb_bulk_read(dev, endpoint_Bulk_in, answer, reqBulkLen, timeout);
+    s = libusb_bulk_transfer(dev, endpoint_Bulk_in, answer, reqBulkLen, &r, timeout);
     if( r != reqBulkLen )
     {
           perror("USB bulk read"); bad("USB read failed");
@@ -300,7 +289,7 @@ void bulk_transfer(usb_dev_handle *dev) {
       for (i=0;i<reqBulkLen; i++) printf("%02x ",answer[i]  & 0xFF);
     }
 
-    usb_release_interface(dev, 0);
+    libusb_release_interface(dev, 0);
 }
 
 
@@ -312,7 +301,7 @@ void ex_program(int sig) {
 
 int main( int argc, char **argv) {
 
-     usb_dev_handle *lvr_winusb = NULL;
+     libusb_device_handle *lvr_winusb = NULL;
      float tempInC;
      float tempOutC;
      int c;
@@ -389,6 +378,7 @@ int main( int argc, char **argv) {
 
      (void) signal(SIGINT, ex_program);
 
+
      ini_control_transfer(lvr_winusb);
 
      control_transfer(lvr_winusb, uTemperatura );
@@ -400,7 +390,6 @@ int main( int argc, char **argv) {
      control_transfer(lvr_winusb, uIni2 );
      interrupt_read(lvr_winusb);
      interrupt_read(lvr_winusb);
-
 
 
      do {
@@ -449,10 +438,10 @@ int main( int argc, char **argv) {
               sleep(seconds);
      } while (!bsalir);
 
-     usb_release_interface(lvr_winusb, INTERFACE1);
-     usb_release_interface(lvr_winusb, INTERFACE2);
+     libusb_release_interface(lvr_winusb, INTERFACE1);
+     libusb_release_interface(lvr_winusb, INTERFACE2);
 
-     usb_close(lvr_winusb);
+     libusb_close(lvr_winusb);
 
      return 0;
 }
