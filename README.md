@@ -32,7 +32,7 @@ Are there any better solutions? (See pcsensor.sh)
 
 Original document below
 ====
-
+```
 pcsensor
 ========
 
@@ -71,3 +71,4 @@ as well as the external sensor.
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+```
