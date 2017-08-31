@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <time.h>
 #include <strings.h>
 #include <errno.h>
@@ -153,7 +154,7 @@ void ini_control_transfer(libusb_device_handle *dev) {
 
     char question[] = { 0x01,0x01 };
 
-    r = libusb_control_transfer(dev, 0x21, 0x09, 0x0201, 0x00, (char *) question, 2, timeout);
+    r = libusb_control_transfer(dev, 0x21, 0x09, 0x0201, 0x00, (unsigned char *) question, 2, timeout);
     if( r < 0 ) {
         perror("USB control write"); bad("USB write failed");
     }
@@ -171,7 +172,7 @@ void control_transfer(libusb_device_handle *dev, const char *pquestion) {
 
     memcpy(question, pquestion, sizeof question);
 
-    r = libusb_control_transfer(dev, 0x21, 0x09, 0x0200, 0x01, (char *) question, reqIntLen, timeout);
+    r = libusb_control_transfer(dev, 0x21, 0x09, 0x0200, 0x01, (unsigned char *) question, reqIntLen, timeout);
     if( r < 0 ) {
         perror("USB control write"); bad("USB write failed");
     }
