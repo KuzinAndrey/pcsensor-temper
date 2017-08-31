@@ -11,7 +11,7 @@ $ make
 ...
 ```
 
-## RHEL
+## RHEL 6
 ```
 # yum install gcc libusb1-devel
 $ make
