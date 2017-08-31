@@ -35,6 +35,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <time.h>
+#include <string.h>
 #include <strings.h>
 #include <errno.h>
 #include <signal.h>
