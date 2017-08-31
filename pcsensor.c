@@ -108,7 +108,7 @@ libusb_device_handle* setup_libusb_access() {
      }
 
      if(!(lvr_winusb = find_lvr_winusb())) {
-                printf("Couldn't find the USB device, Exiting\n");
+                fprintf(stderr, "Couldn't find the USB device, Exiting\n");
                 return NULL;
         }
 
@@ -120,7 +120,7 @@ libusb_device_handle* setup_libusb_access() {
 
 
         if (libusb_set_configuration(lvr_winusb, 0x01) < 0) {
-                printf("Could not set configuration 1\n");
+                fprintf(stderr, "Could not set configuration 1\n");
                 return NULL;
         }
 
@@ -128,12 +128,12 @@ libusb_device_handle* setup_libusb_access() {
         // Microdia tiene 2 interfaces
         int errno;
         if ( ( errno = libusb_claim_interface(lvr_winusb, INTERFACE1) ) != 0) {
-                printf("Could not claim interface. Error:%d\n", errno);
+                fprintf(stderr, "Could not claim interface. Error:%d\n", errno);
                 return NULL;
         }
 
         if ( ( errno = libusb_claim_interface(lvr_winusb, INTERFACE2) ) != 0) {
-                printf("Could not claim interface. Error:%d\n", errno);
+                fprintf(stderr, "Could not claim interface. Error:%d\n", errno);
                 return NULL;
         }
 
@@ -147,7 +147,7 @@ libusb_device_handle *find_lvr_winusb() {
 
         handle = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
         if (!handle) {
-                printf("Could not open USB device\n");
+                fprintf(stderr, "Could not open USB device\n");
                 return NULL;
         }
         return handle;
@@ -201,13 +201,13 @@ void interrupt_transfer(libusb_device_handle *dev) {
     s = libusb_interrupt_transfer(dev, endpoint_Int_out, question, reqIntLen, &r, timeout);
     if( r < 0 )
     {
-          printf("USB write failed:%d", s);
+          fprintf(stderr, "USB write failed:%d", s);
           perror("USB interrupt write"); bad("USB write failed");
     }
     s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
     if( r != reqIntLen )
     {
-          printf("USB read failed:%d", s);
+          fprintf(stderr, "USB read failed:%d", s);
           perror("USB interrupt read"); bad("USB read failed");
     }
 
@@ -227,7 +227,7 @@ void interrupt_read(libusb_device_handle *dev) {
     s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
     if( r != reqIntLen )
     {
-          printf("USB read failed: %d\n", s);
+          fprintf(stderr, "USB read failed: %d\n", s);
           perror("USB interrupt read"); bad("USB read failed");
     }
 
@@ -247,7 +247,7 @@ void interrupt_read_temperatura(libusb_device_handle *dev, float *tempInC, float
     s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
     if( r != reqIntLen )
     {
-          printf("USB read failed: %d\n", s);
+          fprintf(stderr, "USB read failed: %d\n", s);
           perror("USB interrupt read"); bad("USB read failed");
     }
 
