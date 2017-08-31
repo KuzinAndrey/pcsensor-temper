@@ -3,13 +3,17 @@
 
 # Munin plugin for TEMPer
 
-. $MUNIN_LIBDIR/plugins/plugin.sh
+. "${MUNIN_LIBDIR}/plugins/plugin.sh"
+
+set -o nounset
 
 pcsensor=${pcsensor:-/usr/local/bin/pcsensor}
-pcsensor_opts="-m -c"
+pcsensor_cmd="${pcsensor} -m -c"
 
 # need calibration
-cdef='temperature,1.0287,*,0.85,-'
+#   example:
+#     env.cdef  temperature,1.0287,*,0.85,-
+cdef=${cdef:-temperature} 
 
 autoconf() {
     echo 'no'
@@ -24,13 +28,13 @@ graph_scale no
 graph_vlabel Temp C
 graph_args --base 1000 
 temperature.label temperature
-temperature.cdef $cdef
+temperature.cdef ${cdef}
 EOF
     exit 0
 }
 
 fetch() {
-    value=$( $pcsensor $pcsensor_opts | sed -n '1p' )
+    value=$( $pcsensor_cmd | sed -n '1p' )
     echo "temperature.value ${value}"
 }
 
