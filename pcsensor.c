@@ -59,7 +59,7 @@ const static int endpoint_Bulk_in=0x82; /* endpoint 0x81 address for IN */
 const static int endpoint_Bulk_out=0x00; /* endpoint 1 address for OUT */
 const static int timeout=5000; /* timeout in ms */
 
-const static char uTemperatura[] = { 0x01, 0x80, 0x33, 0x01, 0x00, 0x00, 0x00, 0x00 };
+const static char uTemperature[] = { 0x01, 0x80, 0x33, 0x01, 0x00, 0x00, 0x00, 0x00 };
 const static char uIni1[] = { 0x01, 0x82, 0x77, 0x01, 0x00, 0x00, 0x00, 0x00 };
 const static char uIni2[] = { 0x01, 0x86, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00 };
 
@@ -231,7 +231,7 @@ void interrupt_read(libusb_device_handle *dev) {
     }
 }
 
-void interrupt_read_temperatura(libusb_device_handle *dev, float *tempInC, float *tempOutC) {
+void interrupt_read_temperature(libusb_device_handle *dev, float *tempInC, float *TempExC) {
     int r,s,i, temperature;
     unsigned char answer[reqIntLen];
     bzero(answer, reqIntLen);
@@ -254,7 +254,7 @@ void interrupt_read_temperatura(libusb_device_handle *dev, float *tempInC, float
 
     temperature = (answer[5] & 0xFF) + ((signed char)answer[4] << 8);
     temperature += calibration;
-    *tempOutC = temperature * (125.0 / 32000.0);
+    *TempExC = temperature * (125.0 / 32000.0);
 
 }
 
@@ -268,7 +268,7 @@ int main( int argc, char **argv) {
     libusb_device_handle **handles;
     int numdev,i;
     float tempInC;
-    float tempOutC;
+    float TempExC;
     int c;
     struct tm *local;
     time_t t;
@@ -312,14 +312,14 @@ int main( int argc, char **argv) {
             case '?':
             case 'h':
                 printf("pcsensor version %s\n",VERSION);
-                printf("      Aviable options:\n");
-                printf("          -h help\n");
-                printf("          -v verbose\n");
-                printf("          -l[n] loop every 'n' seconds, default value is 5s\n");
-                printf("          -c output only in Celsius\n");
-                printf("          -f output only in Fahrenheit\n");
-                printf("          -a[n] increase or decrease temperature in 'n' degrees for device calibration\n");
-                printf("          -m output for mrtg integration\n");
+                printf("    Available options:\n");
+                printf("        -h help\n");
+                printf("        -v verbose\n");
+                printf("        -l[n] loop every 'n' seconds, default value is 5s\n");
+                printf("        -c output only in Celsius\n");
+                printf("        -f output only in Fahrenheit\n");
+                printf("        -a[n] increase or decrease temperature in 'n' degrees for device calibration\n");
+                printf("        -m output for mrtg integration\n");
 
                 exit(EXIT_FAILURE);
             default:
@@ -345,7 +345,7 @@ int main( int argc, char **argv) {
     for (i = 0; i < numdev; i++) {
         ini_control_transfer(handles[i]);
 
-        control_transfer(handles[i], uTemperatura );
+        control_transfer(handles[i], uTemperature );
         interrupt_read(handles[i]);
 
         control_transfer(handles[i], uIni1 );
@@ -358,8 +358,8 @@ int main( int argc, char **argv) {
 
     do {
         for (i = 0; i < numdev; i++) {
-            control_transfer(handles[i], uTemperatura );
-            interrupt_read_temperatura(handles[i], &tempInC, &tempOutC);
+            control_transfer(handles[i], uTemperature );
+            interrupt_read_temperature(handles[i], &tempInC, &TempExC);
 
             t = time(NULL);
             local = localtime(&t);
@@ -367,10 +367,10 @@ int main( int argc, char **argv) {
             if (mrtg) {
                 if (formato==2) {
                     printf("%.2f\n", (9.0 / 5.0 * tempInC + 32.0));
-                    printf("%.2f\n", (9.0 / 5.0 * tempOutC + 32.0));
+                    printf("%.2f\n", (9.0 / 5.0 * TempExC + 32.0));
                 } else {
                     printf("%.2f\n", tempInC);
-                    printf("%.2f\n", tempOutC);
+                    printf("%.2f\n", TempExC);
                 }
 
                 printf("%02d:%02d\n",
@@ -389,13 +389,13 @@ int main( int argc, char **argv) {
 
                 if (formato==2) {
                     printf("Temperature (%d:internal) %.2fF\n", i, (9.0 / 5.0 * tempInC + 32.0));
-                    printf("Temperature (%d:external) %.2fF\n", i, (9.0 / 5.0 * tempOutC + 32.0));
+                    printf("Temperature (%d:external) %.2fF\n", i, (9.0 / 5.0 * TempExC + 32.0));
                 } else if (formato==1) {
                     printf("Temperature (%d:internal) %.2fC\n", i, tempInC);
-                    printf("Temperature (%d:external) %.2fC\n", i, tempOutC);
+                    printf("Temperature (%d:external) %.2fC\n", i, TempExC);
                 } else {
                     printf("Temperature (%d:internal) %.2fF %.2fC\n", i, (9.0 / 5.0 * tempInC + 32.0), tempInC);
-                    printf("Temperature (%d:external) %.2fF %.2fC\n", i, (9.0 / 5.0 * tempOutC + 32.0), tempOutC);
+                    printf("Temperature (%d:external) %.2fF %.2fC\n", i, (9.0 / 5.0 * TempExC + 32.0), TempExC);
                 }
             }
 
