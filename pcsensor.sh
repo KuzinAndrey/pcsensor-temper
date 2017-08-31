@@ -10,6 +10,12 @@ moduleid=$( modinfo | awk '$6 == "hid" { print $1 }' )
 
 cd "$( dirname "$0" )" || exit 1
 
-modunload -i "$moduleid"
+if [ -n "$moduleid" ]; then 
+    modunload -i "$moduleid"
+fi
+
 ./pcsensor "$@"
-modload "$hiddriver"
+
+if [ -n "$moduleid" ]; then 
+    modload "$hiddriver"
+fi
