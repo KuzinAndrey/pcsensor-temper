@@ -3,6 +3,16 @@ PCSensor / TEMPer2 driver for Linux/Solaris
 
 ![TEMPer](images/New_TEMPer_6.jpg)
 
+A CLI tool for PCsensor TEMPer USB thermometer. http://www.pcsensor.com/
+
+This is based on PCSensor v. 1.0.1 by Juan Carlos Perez.
+
+I have worked on, 
+- Change libusb-0.1 -> libusb-1.0 (to be able to build on Solaris)
+- Support multiple devices
+- Add Munin plugin http://munin-monitoring.org/
+- Some code cleanups, fix indents, typos, ...
+
 # Build
 ## Solaris 11
 ```
@@ -27,6 +37,7 @@ Temperature (0:external) 214.60F 101.45C
 2017/08/31 19:00:35
 Temperature (1:internal) 81.16F 27.31C
 Temperature (1:external) 214.60F 101.45C
+...
 ```
 
 libusb_detach_kernel_driver does not seem to work on Solaris. Thus, it looks necessary to unload hid driver manually.
