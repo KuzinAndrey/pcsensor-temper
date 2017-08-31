@@ -4,6 +4,8 @@
  * All rights reserved.
  *
  * 2011/08/30 Thanks to EdorFaus: bugfix to support negative temperatures
+ * 2017/08/30 Improved by K.Cima: changed libusb-0.1 -> libusb-1.0
+ *            https://github.com/shakemid/pcsensor
  *
  * Temper driver for linux. This program can be compiled either as a library
  * or as a standalone program (-DUNIT_TEST). The driver will work with some
@@ -37,7 +39,7 @@
 #include <signal.h>
 #include <libusb.h>
 
-#define VERSION "1.0.1a"
+#define VERSION "1.1.0"
 
 #define VENDOR_ID  0x0c45
 #define PRODUCT_ID 0x7401
