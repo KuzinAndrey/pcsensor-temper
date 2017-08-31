@@ -66,91 +66,86 @@ static int calibration=0;
 
 
 void bad(const char *why) {
-        fprintf(stderr,"Fatal error> %s\n",why);
-        exit(17);
+    fprintf(stderr,"Fatal error> %s\n",why);
+    exit(17);
 }
 
 libusb_context *ctx = NULL;
 libusb_device_handle *find_lvr_winusb();
 
 void usb_detach(libusb_device_handle *lvr_winusb, int iInterface) {
-        int ret;
+    int ret;
 
-	ret = libusb_detach_kernel_driver(lvr_winusb, iInterface);
-	if(ret) {
-		if(errno == ENODATA) {
-			if(debug) {
-				printf("Device already detached\n");
-			}
-		} else {
-			if(debug) {
-				printf("Detach failed: %s[%d]\n",
-				       strerror(errno), errno);
-				printf("Continuing anyway\n");
-			}
-		}
-	} else {
-		if(debug) {
-			printf("detach successful\n");
-		}
-	}
+    ret = libusb_detach_kernel_driver(lvr_winusb, iInterface);
+    if(ret) {
+        if(errno == ENODATA) {
+            if(debug) {
+                printf("Device already detached\n");
+            }
+        } else {
+            if(debug) {
+                printf("Detach failed: %s[%d]\n",
+                        strerror(errno), errno);
+                printf("Continuing anyway\n");
+            }
+        }
+    } else {
+        if(debug) {
+            printf("detach successful\n");
+        }
+    }
 }
 
 libusb_device_handle* setup_libusb_access() {
-     libusb_device_handle *lvr_winusb;
+    libusb_device_handle *lvr_winusb;
 
-     libusb_init(&ctx);
+    libusb_init(&ctx);
 
-     if(debug) {
+    if(debug) {
         libusb_set_debug(ctx, 4); //LIBUSB_LOG_LEVEL_DEBUG
-     } else {
+    } else {
         libusb_set_debug(ctx, 0); //LIBUSB_LOG_LEVEL_NONE
-     }
+    }
 
-     if(!(lvr_winusb = find_lvr_winusb())) {
-                fprintf(stderr, "Couldn't find the USB device, Exiting\n");
-                return NULL;
-        }
+    if(!(lvr_winusb = find_lvr_winusb())) {
+        fprintf(stderr, "Couldn't find the USB device, Exiting\n");
+        return NULL;
+    }
 
+    usb_detach(lvr_winusb, INTERFACE1);
+    usb_detach(lvr_winusb, INTERFACE2);
 
-        usb_detach(lvr_winusb, INTERFACE1);
+    if (libusb_set_configuration(lvr_winusb, 0x01) < 0) {
+        fprintf(stderr, "Could not set configuration 1\n");
+        return NULL;
+    }
 
+    // Microdia tiene 2 interfaces
+    int s;
+    if ( ( s = libusb_claim_interface(lvr_winusb, INTERFACE1) ) != 0) {
+        fprintf(stderr, "Could not claim interface. Error:%d\n", s);
+        return NULL;
+    }
 
-        usb_detach(lvr_winusb, INTERFACE2);
+    if ( ( s = libusb_claim_interface(lvr_winusb, INTERFACE2) ) != 0) {
+        fprintf(stderr, "Could not claim interface. Error:%d\n", s);
+        return NULL;
+    }
 
-
-        if (libusb_set_configuration(lvr_winusb, 0x01) < 0) {
-                fprintf(stderr, "Could not set configuration 1\n");
-                return NULL;
-        }
-
-
-        // Microdia tiene 2 interfaces
-        int errno;
-        if ( ( errno = libusb_claim_interface(lvr_winusb, INTERFACE1) ) != 0) {
-                fprintf(stderr, "Could not claim interface. Error:%d\n", errno);
-                return NULL;
-        }
-
-        if ( ( errno = libusb_claim_interface(lvr_winusb, INTERFACE2) ) != 0) {
-                fprintf(stderr, "Could not claim interface. Error:%d\n", errno);
-                return NULL;
-        }
-
-        return lvr_winusb;
+    return lvr_winusb;
 }
 
 
 
 libusb_device_handle *find_lvr_winusb() {
-        libusb_device_handle *handle;
+    libusb_device_handle *handle;
 
-        handle = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
-        if (!handle) {
-                fprintf(stderr, "Could not open USB device\n");
-                return NULL;
-        }
-        return handle;
+    handle = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
+    if (!handle) {
+        fprintf(stderr, "Could not open USB device\n");
+        return NULL;
+    }
+    return handle;
 }
 
 
@@ -160,15 +155,13 @@ void ini_control_transfer(libusb_device_handle *dev) {
     char question[] = { 0x01,0x01 };
 
     r = libusb_control_transfer(dev, 0x21, 0x09, 0x0201, 0x00, (char *) question, 2, timeout);
-    if( r < 0 )
-    {
-          perror("USB control write"); bad("USB write failed");
+    if( r < 0 ) {
+        perror("USB control write"); bad("USB write failed");
     }
 
-
     if(debug) {
-      for (i=0;i<reqIntLen; i++) printf("%02x ",question[i] & 0xFF);
-      printf("\n");
+        for (i=0;i<reqIntLen; i++) printf("%02x ",question[i] & 0xFF);
+        printf("\n");
     }
 }
 
@@ -180,9 +173,8 @@ void control_transfer(libusb_device_handle *dev, const char *pquestion) {
     memcpy(question, pquestion, sizeof question);
 
     r = libusb_control_transfer(dev, 0x21, 0x09, 0x0200, 0x01, (char *) question, reqIntLen, timeout);
-    if( r < 0 )
-    {
-          perror("USB control write"); bad("USB write failed");
+    if( r < 0 ) {
+        perror("USB control write"); bad("USB write failed");
     }
 
     if(debug) {
@@ -192,70 +184,65 @@ void control_transfer(libusb_device_handle *dev, const char *pquestion) {
 }
 
 void interrupt_transfer(libusb_device_handle *dev) {
-
     int r,s,i;
     char answer[reqIntLen];
     char question[reqIntLen];
     int transferred;
+
     for (i=0;i<reqIntLen; i++) question[i]=i;
+
     s = libusb_interrupt_transfer(dev, endpoint_Int_out, question, reqIntLen, &r, timeout);
-    if( r < 0 )
-    {
-          fprintf(stderr, "USB write failed:%d", s);
-          perror("USB interrupt write"); bad("USB write failed");
+    if( r < 0 ) {
+        fprintf(stderr, "USB write failed:%d", s);
+        perror("USB interrupt write"); bad("USB write failed");
     }
+
     s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
-    if( r != reqIntLen )
-    {
-          fprintf(stderr, "USB read failed:%d", s);
-          perror("USB interrupt read"); bad("USB read failed");
+    if( r != reqIntLen ) {
+        fprintf(stderr, "USB read failed:%d", s);
+        perror("USB interrupt read"); bad("USB read failed");
     }
 
     if(debug) {
-       for (i=0;i<reqIntLen; i++) printf("%i, %i, \n",question[i],answer[i]);
+        for (i=0;i<reqIntLen; i++) printf("%i, %i, \n",question[i],answer[i]);
     }
 
     libusb_release_interface(dev, 0);
 }
 
 void interrupt_read(libusb_device_handle *dev) {
-
     int r,s,i;
     unsigned char answer[reqIntLen];
     bzero(answer, reqIntLen);
 
     s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
-    if( r != reqIntLen )
-    {
-          fprintf(stderr, "USB read failed: %d\n", s);
-          perror("USB interrupt read"); bad("USB read failed");
+    if( r != reqIntLen ) {
+        fprintf(stderr, "USB read failed: %d\n", s);
+        perror("USB interrupt read"); bad("USB read failed");
     }
 
     if(debug) {
-       for (i=0;i<reqIntLen; i++) printf("%02x ",answer[i]  & 0xFF);
+        for (i=0;i<reqIntLen; i++) printf("%02x ",answer[i]  & 0xFF);
 
-       printf("\n");
+        printf("\n");
     }
 }
 
 void interrupt_read_temperatura(libusb_device_handle *dev, float *tempInC, float *tempOutC) {
-
     int r,s,i, temperature;
     unsigned char answer[reqIntLen];
     bzero(answer, reqIntLen);
 
     s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
-    if( r != reqIntLen )
-    {
-          fprintf(stderr, "USB read failed: %d\n", s);
-          perror("USB interrupt read"); bad("USB read failed");
+    if( r != reqIntLen ) {
+        fprintf(stderr, "USB read failed: %d\n", s);
+        perror("USB interrupt read"); bad("USB read failed");
     }
 
-
     if(debug) {
-      for (i=0;i<reqIntLen; i++) printf("%02x ",answer[i]  & 0xFF);
+        for (i=0;i<reqIntLen; i++) printf("%02x ",answer[i]  & 0xFF);
 
-      printf("\n");
+        printf("\n");
     }
 
     temperature = (answer[3] & 0xFF) + ((signed char)answer[2] << 8);
@@ -269,24 +256,21 @@ void interrupt_read_temperatura(libusb_device_handle *dev, float *tempInC, float
 }
 
 void bulk_transfer(libusb_device_handle *dev) {
-
     int r,s,i;
     char answer[reqBulkLen];
 
     s = libusb_bulk_transfer(dev, endpoint_Bulk_out, NULL, 0, &r, timeout);
-    if( r < 0 )
-    {
-          perror("USB bulk write"); bad("USB write failed");
-    }
-    s = libusb_bulk_transfer(dev, endpoint_Bulk_in, answer, reqBulkLen, &r, timeout);
-    if( r != reqBulkLen )
-    {
-          perror("USB bulk read"); bad("USB read failed");
+    if( r < 0 ) {
+        perror("USB bulk write"); bad("USB write failed");
     }
 
+    s = libusb_bulk_transfer(dev, endpoint_Bulk_in, answer, reqBulkLen, &r, timeout);
+    if( r != reqBulkLen ) {
+        perror("USB bulk read"); bad("USB read failed");
+    }
 
     if(debug) {
-      for (i=0;i<reqBulkLen; i++) printf("%02x ",answer[i]  & 0xFF);
+        for (i=0;i<reqBulkLen; i++) printf("%02x ",answer[i]  & 0xFF);
     }
 
     libusb_release_interface(dev, 0);
@@ -294,154 +278,151 @@ void bulk_transfer(libusb_device_handle *dev) {
 
 
 void ex_program(int sig) {
-      bsalir=1;
+    bsalir=1;
 
-      (void) signal(SIGINT, SIG_DFL);
+    (void) signal(SIGINT, SIG_DFL);
 }
 
 int main( int argc, char **argv) {
+    libusb_device_handle *lvr_winusb = NULL;
+    float tempInC;
+    float tempOutC;
+    int c;
+    struct tm *local;
+    time_t t;
 
-     libusb_device_handle *lvr_winusb = NULL;
-     float tempInC;
-     float tempOutC;
-     int c;
-     struct tm *local;
-     time_t t;
+    while ((c = getopt (argc, argv, "mfcvhl::a:")) != -1)
+        switch (c)
+        {
+            case 'v':
+                debug = 1;
+                break;
+            case 'c':
+                formato=1; //Celsius
+                break;
+            case 'f':
+                formato=2; //Fahrenheit
+                break;
+            case 'm':
+                mrtg=1;
+                break;
+            case 'l':
+                if (optarg!=NULL){
+                    if (!sscanf(optarg,"%i",&seconds)==1) {
+                        fprintf (stderr, "Error: '%s' is not numeric.\n", optarg);
+                        exit(EXIT_FAILURE);
+                    } else {
+                        bsalir = 0;
+                        break;
+                    }
+                } else {
+                    bsalir = 0;
+                    seconds = 5;
+                    break;
+                }
+            case 'a':
+                if (!sscanf(optarg,"%i",&calibration)==1) {
+                    fprintf (stderr, "Error: '%s' is not numeric.\n", optarg);
+                    exit(EXIT_FAILURE);
+                } else {
+                    break;
+                }
+            case '?':
+            case 'h':
+                printf("pcsensor version %s\n",VERSION);
+                printf("      Aviable options:\n");
+                printf("          -h help\n");
+                printf("          -v verbose\n");
+                printf("          -l[n] loop every 'n' seconds, default value is 5s\n");
+                printf("          -c output only in Celsius\n");
+                printf("          -f output only in Fahrenheit\n");
+                printf("          -a[n] increase or decrease temperature in 'n' degrees for device calibration\n");
+                printf("          -m output for mrtg integration\n");
 
-     while ((c = getopt (argc, argv, "mfcvhl::a:")) != -1)
-     switch (c)
-       {
-       case 'v':
-         debug = 1;
-         break;
-       case 'c':
-         formato=1; //Celsius
-         break;
-       case 'f':
-         formato=2; //Fahrenheit
-         break;
-       case 'm':
-         mrtg=1;
-         break;
-       case 'l':
-         if (optarg!=NULL){
-           if (!sscanf(optarg,"%i",&seconds)==1) {
-             fprintf (stderr, "Error: '%s' is not numeric.\n", optarg);
-             exit(EXIT_FAILURE);
-           } else {
-              bsalir = 0;
-              break;
-           }
-         } else {
-           bsalir = 0;
-           seconds = 5;
-           break;
-         }
-       case 'a':
-         if (!sscanf(optarg,"%i",&calibration)==1) {
-             fprintf (stderr, "Error: '%s' is not numeric.\n", optarg);
-             exit(EXIT_FAILURE);
-         } else {
-              break;
-         }
-       case '?':
-       case 'h':
-         printf("pcsensor version %s\n",VERSION);
-	 printf("      Aviable options:\n");
-	 printf("          -h help\n");
-	 printf("          -v verbose\n");
-	 printf("          -l[n] loop every 'n' seconds, default value is 5s\n");
-	 printf("          -c output only in Celsius\n");
-	 printf("          -f output only in Fahrenheit\n");
-	 printf("          -a[n] increase or decrease temperature in 'n' degrees for device calibration\n");
-	 printf("          -m output for mrtg integration\n");
+                exit(EXIT_FAILURE);
+            default:
+                if (isprint (optopt))
+                    fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+                else
+                    fprintf (stderr,
+                            "Unknown option character `\\x%x'.\n",
+                            optopt);
+                exit(EXIT_FAILURE);
+        }
 
-	 exit(EXIT_FAILURE);
-       default:
-         if (isprint (optopt))
-           fprintf (stderr, "Unknown option `-%c'.\n", optopt);
-         else
-           fprintf (stderr,
-                    "Unknown option character `\\x%x'.\n",
-                    optopt);
-         exit(EXIT_FAILURE);
-       }
-
-     if (optind < argc) {
+    if (optind < argc) {
         fprintf(stderr, "Non-option ARGV-elements, try -h for help.\n");
         exit(EXIT_FAILURE);
-     }
+    }
 
-     if ((lvr_winusb = setup_libusb_access()) == NULL) {
-         exit(EXIT_FAILURE);
-     }
+    if ((lvr_winusb = setup_libusb_access()) == NULL) {
+        exit(EXIT_FAILURE);
+    }
 
-     (void) signal(SIGINT, ex_program);
+    (void) signal(SIGINT, ex_program);
 
+    ini_control_transfer(lvr_winusb);
 
-     ini_control_transfer(lvr_winusb);
+    control_transfer(lvr_winusb, uTemperatura );
+    interrupt_read(lvr_winusb);
 
-     control_transfer(lvr_winusb, uTemperatura );
-     interrupt_read(lvr_winusb);
+    control_transfer(lvr_winusb, uIni1 );
+    interrupt_read(lvr_winusb);
 
-     control_transfer(lvr_winusb, uIni1 );
-     interrupt_read(lvr_winusb);
+    control_transfer(lvr_winusb, uIni2 );
+    interrupt_read(lvr_winusb);
+    interrupt_read(lvr_winusb);
 
-     control_transfer(lvr_winusb, uIni2 );
-     interrupt_read(lvr_winusb);
-     interrupt_read(lvr_winusb);
+    do {
+        control_transfer(lvr_winusb, uTemperatura );
+        interrupt_read_temperatura(lvr_winusb, &tempInC, &tempOutC);
 
+        t = time(NULL);
+        local = localtime(&t);
 
-     do {
-           control_transfer(lvr_winusb, uTemperatura );
-           interrupt_read_temperatura(lvr_winusb, &tempInC, &tempOutC);
+        if (mrtg) {
+            if (formato==2) {
+                printf("%.2f\n", (9.0 / 5.0 * tempInC + 32.0));
+                printf("%.2f\n", (9.0 / 5.0 * tempOutC + 32.0));
+            } else {
+                printf("%.2f\n", tempInC);
+                printf("%.2f\n", tempOutC);
+            }
 
-           t = time(NULL);
-           local = localtime(&t);
+            printf("%02d:%02d\n",
+                    local->tm_hour,
+                    local->tm_min);
 
-           if (mrtg) {
-              if (formato==2) {
-                  printf("%.2f\n", (9.0 / 5.0 * tempInC + 32.0));
-                  printf("%.2f\n", (9.0 / 5.0 * tempOutC + 32.0));
-              } else {
-                  printf("%.2f\n", tempInC);
-                  printf("%.2f\n", tempOutC);
-              }
+            printf("pcsensor\n");
+        } else {
+            printf("%04d/%02d/%02d %02d:%02d:%02d\n",
+                    local->tm_year +1900,
+                    local->tm_mon + 1,
+                    local->tm_mday,
+                    local->tm_hour,
+                    local->tm_min,
+                    local->tm_sec);
 
-              printf("%02d:%02d\n",
-                          local->tm_hour,
-                          local->tm_min);
+            if (formato==2) {
+                printf("Temperature (internal) %.2fF\n", (9.0 / 5.0 * tempInC + 32.0));
+                printf("Temperature (external) %.2fF\n", (9.0 / 5.0 * tempOutC + 32.0));
+            } else if (formato==1) {
+                printf("Temperature (internal) %.2fC\n", tempInC);
+                printf("Temperature (external) %.2fC\n", tempOutC);
+            } else {
+                printf("Temperature (internal) %.2fF %.2fC\n", (9.0 / 5.0 * tempInC + 32.0), tempInC);
+                printf("Temperature (external) %.2fF %.2fC\n", (9.0 / 5.0 * tempOutC + 32.0), tempOutC);
+            }
+        }
 
-              printf("pcsensor\n");
-           } else {
-              printf("%04d/%02d/%02d %02d:%02d:%02d\n",
-                          local->tm_year +1900,
-                          local->tm_mon + 1,
-                          local->tm_mday,
-                          local->tm_hour,
-                          local->tm_min,
-                          local->tm_sec);
+        if (!bsalir)
+            sleep(seconds);
+    } while (!bsalir);
 
-              if (formato==2) {
-                  printf("Temperature (internal) %.2fF\n", (9.0 / 5.0 * tempInC + 32.0));
-                  printf("Temperature (external) %.2fF\n", (9.0 / 5.0 * tempOutC + 32.0));
-              } else if (formato==1) {
-                  printf("Temperature (internal) %.2fC\n", tempInC);
-                  printf("Temperature (external) %.2fC\n", tempOutC);
-              } else {
-                  printf("Temperature (internal) %.2fF %.2fC\n", (9.0 / 5.0 * tempInC + 32.0), tempInC);
-                  printf("Temperature (external) %.2fF %.2fC\n", (9.0 / 5.0 * tempOutC + 32.0), tempOutC);
-              }
-           }
+    libusb_release_interface(lvr_winusb, INTERFACE1);
+    libusb_release_interface(lvr_winusb, INTERFACE2);
 
-           if (!bsalir)
-              sleep(seconds);
-     } while (!bsalir);
+    libusb_close(lvr_winusb);
 
-     libusb_release_interface(lvr_winusb, INTERFACE1);
-     libusb_release_interface(lvr_winusb, INTERFACE2);
-
-     libusb_close(lvr_winusb);
-
-     return 0;
+    return 0;
 }
