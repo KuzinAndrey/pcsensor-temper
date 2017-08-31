@@ -137,8 +137,6 @@ libusb_device_handle* setup_libusb_access() {
     return lvr_winusb;
 }
 
-
-
 libusb_device_handle *find_lvr_winusb() {
     libusb_device_handle *handle;
 
@@ -149,7 +147,6 @@ libusb_device_handle *find_lvr_winusb() {
     }
     return handle;
 }
-
 
 void ini_control_transfer(libusb_device_handle *dev) {
     int r,i;
