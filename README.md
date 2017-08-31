@@ -19,6 +19,7 @@ I have worked on,
 # pkg install gcc libusb-1
 $ make
 ...
+# cp pcsensor /usr/local/bin/
 ```
 
 ## RHEL 6
@@ -26,6 +27,7 @@ $ make
 # yum install gcc libusb1-devel
 $ make
 ...
+# cp pcsensor /usr/local/bin/
 ```
 
 # Usage
