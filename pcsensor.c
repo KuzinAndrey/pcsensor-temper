@@ -185,33 +185,6 @@ void control_transfer(libusb_device_handle *dev, const char *pquestion) {
     }
 }
 
-void interrupt_transfer(libusb_device_handle *dev) {
-    int r,s,i;
-    char answer[reqIntLen];
-    char question[reqIntLen];
-    int transferred;
-
-    for (i=0;i<reqIntLen; i++) question[i]=i;
-
-    s = libusb_interrupt_transfer(dev, endpoint_Int_out, question, reqIntLen, &r, timeout);
-    if( r < 0 ) {
-        fprintf(stderr, "USB write failed:%d", s);
-        perror("USB interrupt write"); bad("USB write failed");
-    }
-
-    s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
-    if( r != reqIntLen ) {
-        fprintf(stderr, "USB read failed:%d", s);
-        perror("USB interrupt read"); bad("USB read failed");
-    }
-
-    if(debug) {
-        for (i=0;i<reqIntLen; i++) printf("%i, %i, \n",question[i],answer[i]);
-    }
-
-    libusb_release_interface(dev, 0);
-}
-
 void interrupt_read(libusb_device_handle *dev) {
     int r,s,i;
     unsigned char answer[reqIntLen];
@@ -256,28 +229,6 @@ void interrupt_read_temperatura(libusb_device_handle *dev, float *tempInC, float
     *tempOutC = temperature * (125.0 / 32000.0);
 
 }
-
-void bulk_transfer(libusb_device_handle *dev) {
-    int r,s,i;
-    char answer[reqBulkLen];
-
-    s = libusb_bulk_transfer(dev, endpoint_Bulk_out, NULL, 0, &r, timeout);
-    if( r < 0 ) {
-        perror("USB bulk write"); bad("USB write failed");
-    }
-
-    s = libusb_bulk_transfer(dev, endpoint_Bulk_in, answer, reqBulkLen, &r, timeout);
-    if( r != reqBulkLen ) {
-        perror("USB bulk read"); bad("USB read failed");
-    }
-
-    if(debug) {
-        for (i=0;i<reqBulkLen; i++) printf("%02x ",answer[i]  & 0xFF);
-    }
-
-    libusb_release_interface(dev, 0);
-}
-
 
 void ex_program(int sig) {
     bsalir=1;
