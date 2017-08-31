@@ -21,9 +21,12 @@ $ make
 # Usage
 ```
 $ sudo ./pcsensor
-2017/08/30 17:21:35
-Temperature (internal) 96.58F 35.88C
-Temperature (external) 214.60F 101.45C
+2017/08/31 19:00:35
+Temperature (0:internal) 81.28F 27.38C
+Temperature (0:external) 214.60F 101.45C
+2017/08/31 19:00:35
+Temperature (1:internal) 81.16F 27.31C
+Temperature (1:external) 214.60F 101.45C
 ```
 
 libusb_detach_kernel_driver does not seem to work on Solaris. Thus, it looks necessary to unload hid driver manually.

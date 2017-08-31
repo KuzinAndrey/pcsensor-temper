@@ -49,6 +49,8 @@
 #define INTERFACE1 0x00
 #define INTERFACE2 0x01
 
+#define MAX_DEV 8
+
 const static int reqIntLen=8;
 const static int reqBulkLen=8;
 const static int endpoint_Int_in=0x82; /* endpoint 0x81 address for IN */
@@ -68,14 +70,12 @@ static int formato=0;
 static int mrtg=0;
 static int calibration=0;
 
+static libusb_context *ctx = NULL;
 
 void bad(const char *why) {
     fprintf(stderr,"Fatal error> %s\n",why);
     exit(17);
 }
-
-libusb_context *ctx = NULL;
-libusb_device_handle *find_lvr_winusb();
 
 void usb_detach(libusb_device_handle *lvr_winusb, int iInterface) {
     int ret;
@@ -88,8 +88,7 @@ void usb_detach(libusb_device_handle *lvr_winusb, int iInterface) {
             }
         } else {
             if(debug) {
-                printf("Detach failed: %s[%d]\n",
-                        strerror(errno), errno);
+                printf("Detach failed: %s[%d]\n", strerror(errno), errno);
                 printf("Continuing anyway\n");
             }
         }
@@ -100,8 +99,47 @@ void usb_detach(libusb_device_handle *lvr_winusb, int iInterface) {
     }
 }
 
-libusb_device_handle* setup_libusb_access() {
-    libusb_device_handle *lvr_winusb;
+int find_lvr_winusb(libusb_device_handle **handles) {
+    int i, s, cnt, numdev;
+    libusb_device **devs;
+
+    //handle = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
+
+    cnt = libusb_get_device_list(ctx, &devs);
+    if (cnt < 1) {
+        fprintf(stderr, "Could not find USB device: %d\n", cnt);
+    }
+
+    numdev = 0;
+    for (i = 0; i < cnt && numdev < MAX_DEV; i++) {
+        struct libusb_device_descriptor desc;
+
+        if ((s = libusb_get_device_descriptor(devs[i], &desc)) < 0) {
+            fprintf(stderr, "Could not get USB device descriptor: %d\n", s);
+            continue;
+        }
+
+        if (desc.idVendor == VENDOR_ID && desc.idProduct == PRODUCT_ID) {
+            if(debug) {
+                printf("lvr_winusb with Vendor Id: %x and Product Id: %x found.\n", VENDOR_ID, PRODUCT_ID);
+            }
+
+            if ((s = libusb_open(devs[i], &handles[numdev])) < 0) {
+                fprintf(stderr, "Could not open USB device: %d\n", s);
+                continue;
+            }
+
+            numdev++;
+        }
+    }
+
+    libusb_free_device_list(devs, 1);
+
+    return numdev;
+}
+
+int setup_libusb_access(libusb_device_handle **handles) {
+    int i,numdev;
 
     libusb_init(&ctx);
 
@@ -111,43 +149,34 @@ libusb_device_handle* setup_libusb_access() {
         libusb_set_debug(ctx, 0); //LIBUSB_LOG_LEVEL_NONE
     }
 
-    if(!(lvr_winusb = find_lvr_winusb())) {
-        fprintf(stderr, "Couldn't find the USB device, Exiting\n");
-        return NULL;
+    if((numdev = find_lvr_winusb(handles)) < 1) {
+        fprintf(stderr, "Couldn't find the USB device, Exiting: %d\n", numdev);
+        return -1;
     }
 
-    usb_detach(lvr_winusb, INTERFACE1);
-    usb_detach(lvr_winusb, INTERFACE2);
+    for (i = 0; i < numdev; i++) {
+        usb_detach(handles[i], INTERFACE1);
+        usb_detach(handles[i], INTERFACE2);
 
-    if (libusb_set_configuration(lvr_winusb, 0x01) < 0) {
-        fprintf(stderr, "Could not set configuration 1\n");
-        return NULL;
+        if (libusb_set_configuration(handles[i], 0x01) < 0) {
+            fprintf(stderr, "Could not set configuration 1\n");
+            return -1;
+        }
+
+        // Microdia tiene 2 interfaces
+        int s;
+        if ( ( s = libusb_claim_interface(handles[i], INTERFACE1) ) < 0) {
+            fprintf(stderr, "Could not claim interface. Error:%d\n", s);
+            return -1;
+        }
+
+        if ( ( s = libusb_claim_interface(handles[i], INTERFACE2) ) < 0) {
+            fprintf(stderr, "Could not claim interface. Error:%d\n", s);
+            return -1;
+        }
     }
 
-    // Microdia tiene 2 interfaces
-    int s;
-    if ( ( s = libusb_claim_interface(lvr_winusb, INTERFACE1) ) != 0) {
-        fprintf(stderr, "Could not claim interface. Error:%d\n", s);
-        return NULL;
-    }
-
-    if ( ( s = libusb_claim_interface(lvr_winusb, INTERFACE2) ) != 0) {
-        fprintf(stderr, "Could not claim interface. Error:%d\n", s);
-        return NULL;
-    }
-
-    return lvr_winusb;
-}
-
-libusb_device_handle *find_lvr_winusb() {
-    libusb_device_handle *handle;
-
-    handle = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
-    if (!handle) {
-        fprintf(stderr, "Could not open USB device\n");
-        return NULL;
-    }
-    return handle;
+    return numdev;
 }
 
 void ini_control_transfer(libusb_device_handle *dev) {
@@ -236,7 +265,8 @@ void ex_program(int sig) {
 }
 
 int main( int argc, char **argv) {
-    libusb_device_handle *lvr_winusb = NULL;
+    libusb_device_handle **handles;
+    int numdev,i;
     float tempInC;
     float tempOutC;
     int c;
@@ -296,9 +326,7 @@ int main( int argc, char **argv) {
                 if (isprint (optopt))
                     fprintf (stderr, "Unknown option `-%c'.\n", optopt);
                 else
-                    fprintf (stderr,
-                            "Unknown option character `\\x%x'.\n",
-                            optopt);
+                    fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
                 exit(EXIT_FAILURE);
         }
 
@@ -307,74 +335,81 @@ int main( int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    if ((lvr_winusb = setup_libusb_access()) == NULL) {
+    handles = calloc(MAX_DEV, sizeof(libusb_device_handle*));
+    if ((numdev = setup_libusb_access(handles)) < 1) {
         exit(EXIT_FAILURE);
     }
 
     (void) signal(SIGINT, ex_program);
 
-    ini_control_transfer(lvr_winusb);
+    for (i = 0; i < numdev; i++) {
+        ini_control_transfer(handles[i]);
 
-    control_transfer(lvr_winusb, uTemperatura );
-    interrupt_read(lvr_winusb);
+        control_transfer(handles[i], uTemperatura );
+        interrupt_read(handles[i]);
 
-    control_transfer(lvr_winusb, uIni1 );
-    interrupt_read(lvr_winusb);
+        control_transfer(handles[i], uIni1 );
+        interrupt_read(handles[i]);
 
-    control_transfer(lvr_winusb, uIni2 );
-    interrupt_read(lvr_winusb);
-    interrupt_read(lvr_winusb);
+        control_transfer(handles[i], uIni2 );
+        interrupt_read(handles[i]);
+        interrupt_read(handles[i]);
+    }
 
     do {
-        control_transfer(lvr_winusb, uTemperatura );
-        interrupt_read_temperatura(lvr_winusb, &tempInC, &tempOutC);
+        for (i = 0; i < numdev; i++) {
+            control_transfer(handles[i], uTemperatura );
+            interrupt_read_temperatura(handles[i], &tempInC, &tempOutC);
 
-        t = time(NULL);
-        local = localtime(&t);
+            t = time(NULL);
+            local = localtime(&t);
 
-        if (mrtg) {
-            if (formato==2) {
-                printf("%.2f\n", (9.0 / 5.0 * tempInC + 32.0));
-                printf("%.2f\n", (9.0 / 5.0 * tempOutC + 32.0));
+            if (mrtg) {
+                if (formato==2) {
+                    printf("%.2f\n", (9.0 / 5.0 * tempInC + 32.0));
+                    printf("%.2f\n", (9.0 / 5.0 * tempOutC + 32.0));
+                } else {
+                    printf("%.2f\n", tempInC);
+                    printf("%.2f\n", tempOutC);
+                }
+
+                printf("%02d:%02d\n",
+                        local->tm_hour,
+                        local->tm_min);
+
+                printf("pcsensor:%d\n", i);
             } else {
-                printf("%.2f\n", tempInC);
-                printf("%.2f\n", tempOutC);
+                printf("%04d/%02d/%02d %02d:%02d:%02d\n",
+                        local->tm_year +1900,
+                        local->tm_mon + 1,
+                        local->tm_mday,
+                        local->tm_hour,
+                        local->tm_min,
+                        local->tm_sec);
+
+                if (formato==2) {
+                    printf("Temperature (%d:internal) %.2fF\n", i, (9.0 / 5.0 * tempInC + 32.0));
+                    printf("Temperature (%d:external) %.2fF\n", i, (9.0 / 5.0 * tempOutC + 32.0));
+                } else if (formato==1) {
+                    printf("Temperature (%d:internal) %.2fC\n", i, tempInC);
+                    printf("Temperature (%d:external) %.2fC\n", i, tempOutC);
+                } else {
+                    printf("Temperature (%d:internal) %.2fF %.2fC\n", i, (9.0 / 5.0 * tempInC + 32.0), tempInC);
+                    printf("Temperature (%d:external) %.2fF %.2fC\n", i, (9.0 / 5.0 * tempOutC + 32.0), tempOutC);
+                }
             }
 
-            printf("%02d:%02d\n",
-                    local->tm_hour,
-                    local->tm_min);
-
-            printf("pcsensor\n");
-        } else {
-            printf("%04d/%02d/%02d %02d:%02d:%02d\n",
-                    local->tm_year +1900,
-                    local->tm_mon + 1,
-                    local->tm_mday,
-                    local->tm_hour,
-                    local->tm_min,
-                    local->tm_sec);
-
-            if (formato==2) {
-                printf("Temperature (internal) %.2fF\n", (9.0 / 5.0 * tempInC + 32.0));
-                printf("Temperature (external) %.2fF\n", (9.0 / 5.0 * tempOutC + 32.0));
-            } else if (formato==1) {
-                printf("Temperature (internal) %.2fC\n", tempInC);
-                printf("Temperature (external) %.2fC\n", tempOutC);
-            } else {
-                printf("Temperature (internal) %.2fF %.2fC\n", (9.0 / 5.0 * tempInC + 32.0), tempInC);
-                printf("Temperature (external) %.2fF %.2fC\n", (9.0 / 5.0 * tempOutC + 32.0), tempOutC);
-            }
+            if (!bsalir)
+                sleep(seconds);
         }
-
-        if (!bsalir)
-            sleep(seconds);
     } while (!bsalir);
 
-    libusb_release_interface(lvr_winusb, INTERFACE1);
-    libusb_release_interface(lvr_winusb, INTERFACE2);
+    for (i = 0; i < numdev; i++) {
+        libusb_release_interface(handles[i], INTERFACE1);
+        libusb_release_interface(handles[i], INTERFACE2);
 
-    libusb_close(lvr_winusb);
+        libusb_close(handles[i]);
+    }
 
     return 0;
 }
