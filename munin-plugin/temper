@@ -15,6 +15,8 @@ pcsensor_cmd="${pcsensor} -m -c"
 #     env.cdef  temperature,1.0287,*,0.85,-
 cdef=${cdef:-temperature} 
 
+retry=${retry:-1}
+
 autoconf() {
     echo 'no'
 }
@@ -32,7 +34,21 @@ EOF
 }
 
 fetch() {
-    value=$( $pcsensor_cmd | sed -n '1p' )
+    local value i
+
+    i=0
+    while [ "$i" -le "$retry" ];
+    do 
+        value=$( $pcsensor_cmd | sed -n '1p' )
+
+        if [ -n "$value" ];then
+            break
+        fi
+
+        i=$(( i + 1 ))
+        sleep 5
+    done
+
     echo "temperature.value ${value}"
 }
 
