@@ -213,9 +213,8 @@ void control_transfer(libusb_device_handle *dev, const char *pquestion) {
     }
 }
 
-void interrupt_read(libusb_device_handle *dev) {
+void interrupt_read(libusb_device_handle *dev, unsigned char *answer) {
     int r,s,i;
-    unsigned char answer[reqIntLen];
     bzero(answer, reqIntLen);
 
     s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
@@ -229,33 +228,6 @@ void interrupt_read(libusb_device_handle *dev) {
 
         printf("\n");
     }
-}
-
-void interrupt_read_temperature(libusb_device_handle *dev, float *tempInC, float *tempExC) {
-    int r,s,i, temperature;
-    unsigned char answer[reqIntLen];
-    bzero(answer, reqIntLen);
-
-    s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
-    if(r != reqIntLen) {
-        fprintf(stderr, "USB read failed: %d\n", s);
-        perror("USB interrupt read"); bad("USB read failed");
-    }
-
-    if(debug) {
-        for (i=0;i<reqIntLen; i++) printf("%02x ",answer[i]  & 0xFF);
-
-        printf("\n");
-    }
-
-    temperature = (answer[3] & 0xFF) + ((signed char)answer[2] << 8);
-    temperature += calibration;
-    *tempInC = temperature * (125.0 / 32000.0);
-
-    temperature = (answer[5] & 0xFF) + ((signed char)answer[4] << 8);
-    temperature += calibration;
-    *tempExC = temperature * (125.0 / 32000.0);
-
 }
 
 void ex_program(int sig) {
@@ -267,8 +239,9 @@ void ex_program(int sig) {
 int main( int argc, char **argv) {
     libusb_device_handle **handles;
     int numdev,i;
-    float tempInC;
-    float tempExC;
+    unsigned char *answer;
+    int temperature;
+    float tempInC, tempExC;
     int c;
     struct tm *local;
     time_t t;
@@ -342,24 +315,33 @@ int main( int argc, char **argv) {
 
     (void) signal(SIGINT, ex_program);
 
+    answer = calloc(reqIntLen, sizeof(unsigned char));
     for (i = 0; i < numdev; i++) {
         ini_control_transfer(handles[i]);
 
         control_transfer(handles[i], uTemperature);
-        interrupt_read(handles[i]);
+        interrupt_read(handles[i], answer);
 
         control_transfer(handles[i], uIni1);
-        interrupt_read(handles[i]);
+        interrupt_read(handles[i], answer);
 
         control_transfer(handles[i], uIni2);
-        interrupt_read(handles[i]);
-        interrupt_read(handles[i]);
+        interrupt_read(handles[i], answer);
+        interrupt_read(handles[i], answer);
     }
 
     do {
         for (i = 0; i < numdev; i++) {
             control_transfer(handles[i], uTemperature);
-            interrupt_read_temperature(handles[i], &tempInC, &tempExC);
+            interrupt_read(handles[i], answer);
+
+            temperature = (answer[3] & 0xFF) + ((signed char)answer[2] << 8);
+            temperature += calibration;
+            tempInC = temperature * (125.0 / 32000.0);
+
+            temperature = (answer[5] & 0xFF) + ((signed char)answer[4] << 8);
+            temperature += calibration;
+            tempExC = temperature * (125.0 / 32000.0);
 
             t = time(NULL);
             local = localtime(&t);
