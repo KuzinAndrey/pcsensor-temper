@@ -5,7 +5,9 @@ PCSensor / TEMPer2 driver for Linux/Solaris
 
 A CLI tool for PCsensor TEMPer USB thermometer. http://www.pcsensor.com/
 
-This is based on PCSensor v. 1.0.1 by Juan Carlos Perez.
+This is based on PCSensor v. 1.0.1 by Juan Carlos Perez, introduced at https://relavak.wordpress.com/2009/10/17/temper-temperature-sensor-linux-driver/
+
+Support device 0c45:7401 known as Gold TEMPer. (image above)
 
 I have worked on, 
 - Change libusb-0.1 -> libusb-1.0 (to be able to build on Solaris)
