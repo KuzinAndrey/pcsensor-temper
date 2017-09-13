@@ -165,12 +165,12 @@ int setup_libusb_access(libusb_device_handle **handles) {
 
         // Microdia tiene 2 interfaces
         int s;
-        if ( ( s = libusb_claim_interface(handles[i], INTERFACE1) ) < 0) {
+        if ((s = libusb_claim_interface(handles[i], INTERFACE1)) < 0) {
             fprintf(stderr, "Could not claim interface. Error:%d\n", s);
             return -1;
         }
 
-        if ( ( s = libusb_claim_interface(handles[i], INTERFACE2) ) < 0) {
+        if ((s = libusb_claim_interface(handles[i], INTERFACE2)) < 0) {
             fprintf(stderr, "Could not claim interface. Error:%d\n", s);
             return -1;
         }
@@ -185,7 +185,7 @@ void ini_control_transfer(libusb_device_handle *dev) {
     char question[] = { 0x01,0x01 };
 
     r = libusb_control_transfer(dev, 0x21, 0x09, 0x0201, 0x00, (unsigned char *) question, 2, timeout);
-    if( r < 0 ) {
+    if(r < 0) {
         perror("USB control write"); bad("USB write failed");
     }
 
@@ -203,7 +203,7 @@ void control_transfer(libusb_device_handle *dev, const char *pquestion) {
     memcpy(question, pquestion, sizeof question);
 
     r = libusb_control_transfer(dev, 0x21, 0x09, 0x0200, 0x01, (unsigned char *) question, reqIntLen, timeout);
-    if( r < 0 ) {
+    if(r < 0) {
         perror("USB control write"); bad("USB write failed");
     }
 
@@ -219,7 +219,7 @@ void interrupt_read(libusb_device_handle *dev) {
     bzero(answer, reqIntLen);
 
     s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
-    if( r != reqIntLen ) {
+    if(r != reqIntLen) {
         fprintf(stderr, "USB read failed: %d\n", s);
         perror("USB interrupt read"); bad("USB read failed");
     }
@@ -231,13 +231,13 @@ void interrupt_read(libusb_device_handle *dev) {
     }
 }
 
-void interrupt_read_temperature(libusb_device_handle *dev, float *tempInC, float *TempExC) {
+void interrupt_read_temperature(libusb_device_handle *dev, float *tempInC, float *tempExC) {
     int r,s,i, temperature;
     unsigned char answer[reqIntLen];
     bzero(answer, reqIntLen);
 
     s = libusb_interrupt_transfer(dev, endpoint_Int_in, answer, reqIntLen, &r, timeout);
-    if( r != reqIntLen ) {
+    if(r != reqIntLen) {
         fprintf(stderr, "USB read failed: %d\n", s);
         perror("USB interrupt read"); bad("USB read failed");
     }
@@ -254,7 +254,7 @@ void interrupt_read_temperature(libusb_device_handle *dev, float *tempInC, float
 
     temperature = (answer[5] & 0xFF) + ((signed char)answer[4] << 8);
     temperature += calibration;
-    *TempExC = temperature * (125.0 / 32000.0);
+    *tempExC = temperature * (125.0 / 32000.0);
 
 }
 
@@ -268,7 +268,7 @@ int main( int argc, char **argv) {
     libusb_device_handle **handles;
     int numdev,i;
     float tempInC;
-    float TempExC;
+    float tempExC;
     int c;
     struct tm *local;
     time_t t;
@@ -345,21 +345,21 @@ int main( int argc, char **argv) {
     for (i = 0; i < numdev; i++) {
         ini_control_transfer(handles[i]);
 
-        control_transfer(handles[i], uTemperature );
+        control_transfer(handles[i], uTemperature);
         interrupt_read(handles[i]);
 
-        control_transfer(handles[i], uIni1 );
+        control_transfer(handles[i], uIni1);
         interrupt_read(handles[i]);
 
-        control_transfer(handles[i], uIni2 );
+        control_transfer(handles[i], uIni2);
         interrupt_read(handles[i]);
         interrupt_read(handles[i]);
     }
 
     do {
         for (i = 0; i < numdev; i++) {
-            control_transfer(handles[i], uTemperature );
-            interrupt_read_temperature(handles[i], &tempInC, &TempExC);
+            control_transfer(handles[i], uTemperature);
+            interrupt_read_temperature(handles[i], &tempInC, &tempExC);
 
             t = time(NULL);
             local = localtime(&t);
@@ -367,10 +367,10 @@ int main( int argc, char **argv) {
             if (mrtg) {
                 if (formato==2) {
                     printf("%.2f\n", (9.0 / 5.0 * tempInC + 32.0));
-                    printf("%.2f\n", (9.0 / 5.0 * TempExC + 32.0));
+                    printf("%.2f\n", (9.0 / 5.0 * tempExC + 32.0));
                 } else {
                     printf("%.2f\n", tempInC);
-                    printf("%.2f\n", TempExC);
+                    printf("%.2f\n", tempExC);
                 }
 
                 printf("%02d:%02d\n",
@@ -389,13 +389,13 @@ int main( int argc, char **argv) {
 
                 if (formato==2) {
                     printf("Temperature (%d:internal) %.2fF\n", i, (9.0 / 5.0 * tempInC + 32.0));
-                    printf("Temperature (%d:external) %.2fF\n", i, (9.0 / 5.0 * TempExC + 32.0));
+                    printf("Temperature (%d:external) %.2fF\n", i, (9.0 / 5.0 * tempExC + 32.0));
                 } else if (formato==1) {
                     printf("Temperature (%d:internal) %.2fC\n", i, tempInC);
-                    printf("Temperature (%d:external) %.2fC\n", i, TempExC);
+                    printf("Temperature (%d:external) %.2fC\n", i, tempExC);
                 } else {
                     printf("Temperature (%d:internal) %.2fF %.2fC\n", i, (9.0 / 5.0 * tempInC + 32.0), tempInC);
-                    printf("Temperature (%d:external) %.2fF %.2fC\n", i, (9.0 / 5.0 * TempExC + 32.0), TempExC);
+                    printf("Temperature (%d:external) %.2fF %.2fC\n", i, (9.0 / 5.0 * tempExC + 32.0), tempExC);
                 }
             }
 
