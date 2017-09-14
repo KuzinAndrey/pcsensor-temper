@@ -316,6 +316,7 @@ int main( int argc, char **argv) {
     (void) signal(SIGINT, ex_program);
 
     answer = calloc(reqIntLen, sizeof(unsigned char));
+    /* This looks unnecessary
     for (i = 0; i < numdev; i++) {
         ini_control_transfer(handles[i]);
 
@@ -329,6 +330,7 @@ int main( int argc, char **argv) {
         interrupt_read(handles[i], answer);
         interrupt_read(handles[i], answer);
     }
+    */
 
     do {
         for (i = 0; i < numdev; i++) {
