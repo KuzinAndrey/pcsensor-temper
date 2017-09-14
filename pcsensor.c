@@ -114,13 +114,18 @@ int find_lvr_winusb(libusb_device_handle **handles) {
         }
 
         if (desc.idVendor == VENDOR_ID && desc.idProduct == PRODUCT_ID) {
-            if(debug) {
-                printf("lvr_winusb with Vendor Id: %x and Product Id: %x found.\n", VENDOR_ID, PRODUCT_ID);
-            }
-
             if ((s = libusb_open(devs[i], &handles[numdev])) < 0) {
                 fprintf(stderr, "Could not open USB device: %d\n", s);
                 continue;
+            }
+
+            if(debug) {
+                unsigned char descmanu[256], descprod[256], descseri[256];
+                libusb_get_string_descriptor_ascii(handles[numdev], desc.iManufacturer, descmanu, 256);
+                libusb_get_string_descriptor_ascii(handles[numdev], desc.iProduct, descprod, 256);
+                libusb_get_string_descriptor_ascii(handles[numdev], desc.iSerialNumber, descseri, 256);
+                printf("lvr_winusb with VendorID:%04x ProductID:%04x Manufacturer:%s Product:%s Serial:%s found.\n", 
+                       desc.idVendor, desc.idProduct, descmanu, descprod, descseri);
             }
 
             numdev++;
