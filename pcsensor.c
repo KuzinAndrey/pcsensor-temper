@@ -52,11 +52,7 @@
 #define MAX_DEV 8
 
 const static int reqIntLen=8;
-const static int reqBulkLen=8;
 const static int endpoint_Int_in=0x82; /* endpoint 0x81 address for IN */
-const static int endpoint_Int_out=0x00; /* endpoint 1 address for OUT */
-const static int endpoint_Bulk_in=0x82; /* endpoint 0x81 address for IN */
-const static int endpoint_Bulk_out=0x00; /* endpoint 1 address for OUT */
 const static int timeout=5000; /* timeout in ms */
 
 const static char uTemperature[] = { 0x01, 0x80, 0x33, 0x01, 0x00, 0x00, 0x00, 0x00 };
