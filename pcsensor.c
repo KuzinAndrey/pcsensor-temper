@@ -62,9 +62,7 @@ const static char uIni2[] = { 0x01, 0x86, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00 };
 static int bsalir=1;
 static int debug=0;
 static int seconds=5;
-static int formato=0;
-static int mrtg=0;
-static int calibration=0;
+static int formato=1; //Celsius
 
 static libusb_context *ctx = NULL;
 
@@ -237,25 +235,20 @@ int main( int argc, char **argv) {
     int numdev,i;
     unsigned char *answer;
     int temperature;
+    char strdate[20];
     float tempInC, tempExC;
     int c;
     struct tm *local;
     time_t t;
 
-    while ((c = getopt (argc, argv, "mfcvhl::a:")) != -1)
+    while ((c = getopt (argc, argv, "fvhl::")) != -1)
         switch (c)
         {
             case 'v':
                 debug = 1;
                 break;
-            case 'c':
-                formato=1; //Celsius
-                break;
             case 'f':
                 formato=2; //Fahrenheit
-                break;
-            case 'm':
-                mrtg=1;
                 break;
             case 'l':
                 if (optarg!=NULL){
@@ -271,13 +264,6 @@ int main( int argc, char **argv) {
                     seconds = 5;
                     break;
                 }
-            case 'a':
-                if (!sscanf(optarg,"%i",&calibration)==1) {
-                    fprintf (stderr, "Error: '%s' is not numeric.\n", optarg);
-                    exit(EXIT_FAILURE);
-                } else {
-                    break;
-                }
             case '?':
             case 'h':
                 printf("pcsensor version %s\n",VERSION);
@@ -285,10 +271,7 @@ int main( int argc, char **argv) {
                 printf("        -h help\n");
                 printf("        -v verbose\n");
                 printf("        -l[n] loop every 'n' seconds, default value is 5s\n");
-                printf("        -c output only in Celsius\n");
-                printf("        -f output only in Fahrenheit\n");
-                printf("        -a[n] increase or decrease temperature in 'n' degrees for device calibration\n");
-                printf("        -m output for mrtg integration\n");
+                printf("        -f output in Fahrenheit (default: Celsius)\n");
 
                 exit(EXIT_FAILURE);
             default:
@@ -334,49 +317,28 @@ int main( int argc, char **argv) {
             interrupt_read(handles[i], answer);
 
             temperature = (answer[3] & 0xFF) + ((signed char)answer[2] << 8);
-            temperature += calibration;
             tempInC = temperature * (125.0 / 32000.0);
 
             temperature = (answer[5] & 0xFF) + ((signed char)answer[4] << 8);
-            temperature += calibration;
             tempExC = temperature * (125.0 / 32000.0);
 
             t = time(NULL);
             local = localtime(&t);
 
-            if (mrtg) {
-                if (formato==2) {
-                    printf("%.2f\n", (9.0 / 5.0 * tempInC + 32.0));
-                    printf("%.2f\n", (9.0 / 5.0 * tempExC + 32.0));
-                } else {
-                    printf("%.2f\n", tempInC);
-                    printf("%.2f\n", tempExC);
-                }
+            sprintf(strdate, "%04d-%02d-%02dT%02d:%02d:%02d",
+                    local->tm_year +1900,
+                    local->tm_mon + 1,
+                    local->tm_mday,
+                    local->tm_hour,
+                    local->tm_min,
+                    local->tm_sec);
 
-                printf("%02d:%02d\n",
-                        local->tm_hour,
-                        local->tm_min);
-
-                printf("pcsensor:%d\n", i);
+            if (formato==2) {
+                printf("%s\t%d\tinternal\t%.2f\n", strdate, i, (9.0 / 5.0 * tempInC + 32.0));
+                printf("%s\t%d\texternal\t%.2f\n", strdate, i, (9.0 / 5.0 * tempExC + 32.0));
             } else {
-                printf("%04d/%02d/%02d %02d:%02d:%02d\n",
-                        local->tm_year +1900,
-                        local->tm_mon + 1,
-                        local->tm_mday,
-                        local->tm_hour,
-                        local->tm_min,
-                        local->tm_sec);
-
-                if (formato==2) {
-                    printf("Temperature (%d:internal) %.2fF\n", i, (9.0 / 5.0 * tempInC + 32.0));
-                    printf("Temperature (%d:external) %.2fF\n", i, (9.0 / 5.0 * tempExC + 32.0));
-                } else if (formato==1) {
-                    printf("Temperature (%d:internal) %.2fC\n", i, tempInC);
-                    printf("Temperature (%d:external) %.2fC\n", i, tempExC);
-                } else {
-                    printf("Temperature (%d:internal) %.2fF %.2fC\n", i, (9.0 / 5.0 * tempInC + 32.0), tempInC);
-                    printf("Temperature (%d:external) %.2fF %.2fC\n", i, (9.0 / 5.0 * tempExC + 32.0), tempExC);
-                }
+                printf("%s\t%d\tinternal\t%.2f\n", strdate, i, tempInC);
+                printf("%s\t%d\texternal\t%.2f\n", strdate, i, tempExC);
             }
 
             if (!bsalir)

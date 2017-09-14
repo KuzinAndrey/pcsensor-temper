@@ -8,7 +8,6 @@
 set -o nounset
 
 pcsensor=${pcsensor:-/usr/local/bin/pcsensor}
-pcsensor_cmd="${pcsensor} -m -c"
 
 # need calibration
 #   example:
@@ -39,7 +38,7 @@ fetch() {
     i=0
     while [ "$i" -le "$retry" ];
     do 
-        value=$( $pcsensor_cmd | sed -n '1p' )
+        value=$( $pcsensor | sed -n '1p' | awk '{ print $4 }' )
 
         if [ -n "$value" ];then
             break
