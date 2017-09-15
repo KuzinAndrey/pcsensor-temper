@@ -144,10 +144,10 @@ int find_lvr_winusb(temper_device_t *devices) {
 
         for (j = 0; j < TEMPER_TYPES; j++) {
             if (desc.idVendor == tempers[j].vendor_id && desc.idProduct == tempers[j].product_id) {
-                unsigned char bus, port, descmanu[256], descprod[256], descseri[256];
+                unsigned char bus, addr, descmanu[256], descprod[256], descseri[256];
 
                 bus = libusb_get_bus_number(devs[i]);
-                port = libusb_get_port_number(devs[i]);
+                addr = libusb_get_device_address(devs[i]);
 
                 if ((s = libusb_open(devs[i], &devices[numdev].handle)) < 0) {
                     fprintf(stderr, "Could not open USB device: %d\n", s);
@@ -173,8 +173,8 @@ int find_lvr_winusb(temper_device_t *devices) {
                 } 
 
                 if (debug) {
-                    printf("lvr_winusb with Bus:%03d Port:%03d VendorID:%04x ProductID:%04x Manufacturer:%s Product:%s Serial:%s found.\n", 
-                            bus, port, desc.idVendor, desc.idProduct, descmanu, descprod, descseri);
+                    printf("lvr_winusb with Bus:%03d Addr:%03d VendorID:%04x ProductID:%04x Manufacturer:%s Product:%s Serial:%s found.\n", 
+                            bus, addr, desc.idVendor, desc.idProduct, descmanu, descprod, descseri);
                 }
 
                 numdev++;
