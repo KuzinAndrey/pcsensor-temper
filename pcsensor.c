@@ -328,6 +328,8 @@ void decode_answer_sht1x(unsigned char *answer, float *tempd, float *calibration
     buf = ((signed char)answer[4] << 8) + (answer[5] && 0xFF);
     tempd[1] = -2.0468 + 0.0367 * buf - 1.5955e-6 * buf * buf;
     tempd[1] = ( tempd[0] - 25 ) * ( 0.01 + 0.00008 * tempd[1] ) + tempd[1];
+    if (tempd[1] <  0) tempd[1] = 0;
+    if (tempd[1] > 99) tempd[1] = 100;
 };
 
 int main(int argc, char **argv) {
