@@ -246,11 +246,14 @@ int main( int argc, char **argv) {
     struct tm *local;
     time_t t;
 
-    while ((c = getopt (argc, argv, "fvhl::")) != -1)
+    while ((c = getopt (argc, argv, "vcfl::h")) != -1)
         switch (c)
         {
             case 'v':
                 debug = 1;
+                break;
+            case 'c':
+                formato=1; //Celsius
                 break;
             case 'f':
                 formato=2; //Fahrenheit
@@ -276,7 +279,8 @@ int main( int argc, char **argv) {
                 printf("        -h help\n");
                 printf("        -v verbose\n");
                 printf("        -l[n] loop every 'n' seconds, default value is 5s\n");
-                printf("        -f output in Fahrenheit (default: Celsius)\n");
+                printf("        -c output in Celsius (default)\n");
+                printf("        -f output in Fahrenheit\n");
 
                 exit(EXIT_FAILURE);
             default:
@@ -339,11 +343,11 @@ int main( int argc, char **argv) {
                     local->tm_sec);
 
             if (formato==2) {
-                printf("%s\t%d\tinternal\t%.2f\n", strdate, i, (9.0 / 5.0 * tempInC + 32.0));
-                printf("%s\t%d\texternal\t%.2f\n", strdate, i, (9.0 / 5.0 * tempExC + 32.0));
+                printf("%s\t%d\tinternal\t%.2f F\n", strdate, i, (9.0 / 5.0 * tempInC + 32.0));
+                printf("%s\t%d\texternal\t%.2f F\n", strdate, i, (9.0 / 5.0 * tempExC + 32.0));
             } else {
-                printf("%s\t%d\tinternal\t%.2f\n", strdate, i, tempInC);
-                printf("%s\t%d\texternal\t%.2f\n", strdate, i, tempExC);
+                printf("%s\t%d\tinternal\t%.2f C\n", strdate, i, tempInC);
+                printf("%s\t%d\texternal\t%.2f C\n", strdate, i, tempExC);
             }
 
             if (!bsalir)
