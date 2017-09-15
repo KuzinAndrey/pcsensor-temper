@@ -7,7 +7,11 @@
 
 set -o nounset
 
+# path to pcsensor
 pcsensor=${pcsensor:-/usr/local/bin/pcsensor}
+
+# device number
+device=${device:-0}
 
 # need calibration
 #   example:
@@ -22,14 +26,26 @@ autoconf() {
 
 config() {
     cat <<EOF
-graph_title Temperature
+graph_title TEMPer
 graph_category sensors
 graph_scale no
 graph_vlabel Temp C
 graph_args --base 1000 
-temperature.label temperature
-temperature.cdef ${cdef}
 EOF
+
+    "$pcsensor" | awk '$2 == '"$device"' { print $3 }' |
+    while read -r label
+    do
+        echo "${label}.label ${label}"
+        echo "${label}.cdef ${cdef}"
+
+        if [ "$label" = 'humidity' ]; then
+            echo "${label}.draw AREA"
+            echo "graph_order humidity temperature"
+        else
+            echo "${label}.draw LINE"
+        fi
+    done
 }
 
 fetch() {
@@ -38,7 +54,7 @@ fetch() {
     i=0
     while [ "$i" -le "$retry" ];
     do 
-        value=$( $pcsensor | sed -n '1p' | awk '{ print $4 }' )
+        value=$( "$pcsensor" | awk '$2 == '"$device"' { print $4 }' )
 
         if [ -n "$value" ];then
             break
