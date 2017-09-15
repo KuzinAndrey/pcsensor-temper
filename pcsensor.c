@@ -395,17 +395,17 @@ int main(int argc, char **argv) {
     answer = calloc(reqIntLen, sizeof(unsigned char));
     /* This looks unnecessary
     for (i = 0; i < numdev; i++) {
-        ini_control_transfer(handles[i]);
+        ini_control_transfer(devices[i].handle);
 
-        control_transfer(handles[i], uTemperature);
-        interrupt_read(handles[i], answer);
+        control_transfer(devices[i].handle, uTemperature);
+        interrupt_read(devices[i].handle, answer);
 
-        control_transfer(handles[i], uIni1);
-        interrupt_read(handles[i], answer);
+        control_transfer(devices[i].handle, uIni1);
+        interrupt_read(devices[i].handle, answer);
 
-        control_transfer(handles[i], uIni2);
-        interrupt_read(handles[i], answer);
-        interrupt_read(handles[i], answer);
+        control_transfer(devices[i].handle, uIni2);
+        interrupt_read(devices[i].handle, answer);
+        interrupt_read(devices[i].handle, answer);
     }
     */
 
