@@ -280,6 +280,19 @@ void interrupt_read(libusb_device_handle *dev, unsigned char *answer) {
     }
 }
 
+void cleanup_usb_devices(temper_device_t *devices, int numdev) {
+    int i;
+
+    for (i = 0; i < numdev; i++) {
+        libusb_release_interface(devices[i].handle, INTERFACE1);
+        libusb_release_interface(devices[i].handle, INTERFACE2);
+
+        libusb_close(devices[i].handle);
+    }
+
+    libusb_exit(ctx);
+}
+
 void ex_program(int sig) {
     bsalir=1;
 
@@ -452,14 +465,7 @@ int main(int argc, char **argv) {
             sleep(seconds);
     } while (!bsalir);
 
-    for (i = 0; i < numdev; i++) {
-        libusb_release_interface(devices[i].handle, INTERFACE1);
-        libusb_release_interface(devices[i].handle, INTERFACE2);
-
-        libusb_close(devices[i].handle);
-    }
-
-    libusb_exit(ctx);
+    cleanup_usb_devices(devices, numdev);
 
     return 0;
 }
