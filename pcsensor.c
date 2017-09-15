@@ -45,10 +45,7 @@
 
 /* TEMPer type definition */
 
-#define MAX_DEV 8
-#define TEMPER_TYPES 3
-
-struct temper_type {
+typedef struct temper_type {
     const int vendor_id;
     const int product_id;
     const char product_name[256];
@@ -56,18 +53,27 @@ struct temper_type {
     const int has_sensor; // number of temperature sensor
     const int has_humid;  // flag for humidity sensor
     void (*decode_func)();
-};
+} temper_type_t;
+
+typedef struct temper_device {
+    libusb_device_handle *handle;
+    temper_type_t *type;
+} temper_device_t;
 
 void decode_answer_fm75();
 void decode_answer_sht1x();
 
-struct temper_type tempers[TEMPER_TYPES] = {
+#define TEMPER_TYPES 3
+
+temper_type_t tempers[TEMPER_TYPES] = {
     { 0x0c45, 0x7401, "TEMPer2",   1, 2, 0, decode_answer_fm75  }, // TEMPer2* eg. TEMPer2V1.3
     { 0x0c45, 0x7401, "TEMPer1",   0, 1, 0, decode_answer_fm75  }, // other 0c45:7401 eg. TEMPerV1.4
     { 0x0c45, 0x7402, "TEMPerHUM", 0, 1, 1, decode_answer_sht1x },
 };
 
 /* global variables */
+
+#define MAX_DEV 8
 
 #define INTERFACE1 0x00
 #define INTERFACE2 0x01
@@ -116,7 +122,7 @@ void usb_detach(libusb_device_handle *lvr_winusb, int iInterface) {
     }
 }
 
-int find_lvr_winusb(libusb_device_handle **handles, int *types) {
+int find_lvr_winusb(temper_device_t *devices) {
     int i, j, s, cnt, numdev;
     libusb_device **devs;
 
@@ -143,27 +149,27 @@ int find_lvr_winusb(libusb_device_handle **handles, int *types) {
                 bus = libusb_get_bus_number(devs[i]);
                 port = libusb_get_port_number(devs[i]);
 
-                if ((s = libusb_open(devs[i], &handles[numdev])) < 0) {
+                if ((s = libusb_open(devs[i], &devices[numdev].handle)) < 0) {
                     fprintf(stderr, "Could not open USB device: %d\n", s);
                     continue;
                 }
 
-                libusb_get_string_descriptor_ascii(handles[numdev], desc.iManufacturer, descmanu, 256);
-                libusb_get_string_descriptor_ascii(handles[numdev], desc.iProduct, descprod, 256);
-                libusb_get_string_descriptor_ascii(handles[numdev], desc.iSerialNumber, descseri, 256);
+                libusb_get_string_descriptor_ascii(devices[numdev].handle, desc.iManufacturer, descmanu, 256);
+                libusb_get_string_descriptor_ascii(devices[numdev].handle, desc.iProduct, descprod, 256);
+                libusb_get_string_descriptor_ascii(devices[numdev].handle, desc.iSerialNumber, descseri, 256);
 
                 if (tempers[j].check_product_name) {
                     if (strncmp((const char*)descprod, tempers[j].product_name, strlen(tempers[j].product_name)) == 0) {
-                        types[numdev] = j;
+                        devices[numdev].type = &tempers[j];
                     }
                     else {
                         // vid and pid match, but product name unmatch
-                        libusb_close(handles[numdev]);
+                        libusb_close(devices[numdev].handle);
                         continue; 
                     }
                 }
                 else {
-                    types[numdev] = j;
+                    devices[numdev].type = &tempers[j];
                 } 
 
                 if (debug) {
@@ -181,7 +187,7 @@ int find_lvr_winusb(libusb_device_handle **handles, int *types) {
     return numdev;
 }
 
-int setup_libusb_access(libusb_device_handle **handles, int *types) {
+int setup_libusb_access(temper_device_t *devices) {
     int i;
     int numdev;
 
@@ -193,28 +199,28 @@ int setup_libusb_access(libusb_device_handle **handles, int *types) {
         libusb_set_debug(ctx, 0); //LIBUSB_LOG_LEVEL_NONE
     }
 
-    if((numdev = find_lvr_winusb(handles, types)) < 1) {
+    if((numdev = find_lvr_winusb(devices)) < 1) {
         fprintf(stderr, "Couldn't find the USB device, Exiting: %d\n", numdev);
         return -1;
     }
 
     for (i = 0; i < numdev; i++) {
-        usb_detach(handles[i], INTERFACE1);
-        usb_detach(handles[i], INTERFACE2);
+        usb_detach(devices[i].handle, INTERFACE1);
+        usb_detach(devices[i].handle, INTERFACE2);
 
-        if (libusb_set_configuration(handles[i], 0x01) < 0) {
+        if (libusb_set_configuration(devices[i].handle, 0x01) < 0) {
             fprintf(stderr, "Could not set configuration 1\n");
             return -1;
         }
 
         // Microdia tiene 2 interfaces
         int s;
-        if ((s = libusb_claim_interface(handles[i], INTERFACE1)) < 0) {
+        if ((s = libusb_claim_interface(devices[i].handle, INTERFACE1)) < 0) {
             fprintf(stderr, "Could not claim interface. Error:%d\n", s);
             return -1;
         }
 
-        if ((s = libusb_claim_interface(handles[i], INTERFACE2)) < 0) {
+        if ((s = libusb_claim_interface(devices[i].handle, INTERFACE2)) < 0) {
             fprintf(stderr, "Could not claim interface. Error:%d\n", s);
             return -1;
         }
@@ -312,8 +318,7 @@ void decode_answer_sht1x(unsigned char *answer, float *tempd, float *calibration
 };
 
 int main(int argc, char **argv) {
-    libusb_device_handle **handles;
-    int *types;
+    temper_device_t *devices;
     int numdev,i;
     unsigned char *answer;
     float tempd[2];
@@ -380,9 +385,8 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    handles = calloc(MAX_DEV, sizeof(libusb_device_handle*));
-    types = calloc(MAX_DEV, sizeof(int));
-    if ((numdev = setup_libusb_access(handles, types)) < 1) {
+    devices = calloc(MAX_DEV, sizeof(temper_device_t*));
+    if ((numdev = setup_libusb_access(devices)) < 1) {
         exit(EXIT_FAILURE);
     }
 
@@ -407,9 +411,9 @@ int main(int argc, char **argv) {
 
     do {
         for (i = 0; i < numdev; i++) {
-            control_transfer(handles[i], uTemperature);
-            interrupt_read(handles[i], answer);
-            tempers[types[i]].decode_func(answer, tempd, calibration);
+            control_transfer(devices[i].handle, uTemperature);
+            interrupt_read(devices[i].handle, answer);
+            devices[i].type->decode_func(answer, tempd, calibration);
 
             t = time(NULL);
             local = localtime(&t);
@@ -426,19 +430,19 @@ int main(int argc, char **argv) {
             if (formato==2) {
                 // in Fahrenheit
                 printf("%s\t%d\tinternal\t%.2f F\n", strdate, i, (9.0 / 5.0 * tempd[0] + 32.0));
-                if (tempers[types[i]].has_sensor == 2) {
+                if (devices[i].type->has_sensor == 2) {
                     printf("%s\t%d\texternal\t%.2f F\n", strdate, i, (9.0 / 5.0 * tempd[1] + 32.0));
                 }
             } else {
                 // in Celsius
                 printf("%s\t%d\tinternal\t%.2f C\n", strdate, i, tempd[0]);
-                if (tempers[types[i]].has_sensor == 2) {
+                if (devices[i].type->has_sensor == 2) {
                     printf("%s\t%d\texternal\t%.2f C\n", strdate, i, tempd[1]);
                 }
             }
 
             // print humidity
-            if (tempers[types[i]].has_humid == 1) {
+            if (devices[i].type->has_humid == 1) {
                 printf("%s\t%d\thumidity\t%.2f %%\n", strdate, i, tempd[1]);
             }
 
@@ -448,10 +452,10 @@ int main(int argc, char **argv) {
     } while (!bsalir);
 
     for (i = 0; i < numdev; i++) {
-        libusb_release_interface(handles[i], INTERFACE1);
-        libusb_release_interface(handles[i], INTERFACE2);
+        libusb_release_interface(devices[i].handle, INTERFACE1);
+        libusb_release_interface(devices[i].handle, INTERFACE2);
 
-        libusb_close(handles[i]);
+        libusb_close(devices[i].handle);
     }
 
     return 0;
