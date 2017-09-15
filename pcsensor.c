@@ -385,7 +385,7 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    devices = calloc(MAX_DEV, sizeof(temper_device_t*));
+    devices = calloc(MAX_DEV, sizeof(temper_device_t));
     if ((numdev = setup_libusb_access(devices)) < 1) {
         exit(EXIT_FAILURE);
     }
@@ -411,13 +411,9 @@ int main(int argc, char **argv) {
 
     do {
         for (i = 0; i < numdev; i++) {
-            control_transfer(devices[i].handle, uTemperature);
-            interrupt_read(devices[i].handle, answer);
-            devices[i].type->decode_func(answer, tempd, calibration);
-
+            // get localtime
             t = time(NULL);
             local = localtime(&t);
-
             sprintf(strdate, "%04d-%02d-%02dT%02d:%02d:%02d",
                     local->tm_year +1900,
                     local->tm_mon + 1,
@@ -425,6 +421,11 @@ int main(int argc, char **argv) {
                     local->tm_hour,
                     local->tm_min,
                     local->tm_sec);
+
+            // get temperature
+            control_transfer(devices[i].handle, uTemperature);
+            interrupt_read(devices[i].handle, answer);
+            devices[i].type->decode_func(answer, tempd, calibration);
 
             // print temperature
             if (formato==2) {
