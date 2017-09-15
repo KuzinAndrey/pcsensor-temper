@@ -459,5 +459,7 @@ int main(int argc, char **argv) {
         libusb_close(devices[i].handle);
     }
 
+    libusb_exit(ctx);
+
     return 0;
 }
