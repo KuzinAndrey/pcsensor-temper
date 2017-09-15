@@ -120,12 +120,14 @@ int find_lvr_winusb(libusb_device_handle **handles) {
             }
 
             if(debug) {
-                unsigned char descmanu[256], descprod[256], descseri[256];
+                unsigned char bus, port, descmanu[256], descprod[256], descseri[256];
+                bus = libusb_get_bus_number(devs[i]);
+                port = libusb_get_port_number(devs[i]);
                 libusb_get_string_descriptor_ascii(handles[numdev], desc.iManufacturer, descmanu, 256);
                 libusb_get_string_descriptor_ascii(handles[numdev], desc.iProduct, descprod, 256);
                 libusb_get_string_descriptor_ascii(handles[numdev], desc.iSerialNumber, descseri, 256);
-                printf("lvr_winusb with VendorID:%04x ProductID:%04x Manufacturer:%s Product:%s Serial:%s found.\n", 
-                       desc.idVendor, desc.idProduct, descmanu, descprod, descseri);
+                printf("lvr_winusb with Bus:%03d Port:%03d VendorID:%04x ProductID:%04x Manufacturer:%s Product:%s Serial:%s found.\n", 
+                       bus, port, desc.idVendor, desc.idProduct, descmanu, descprod, descseri);
             }
 
             numdev++;
