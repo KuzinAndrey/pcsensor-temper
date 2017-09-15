@@ -446,10 +446,9 @@ int main(int argc, char **argv) {
             if (devices[i].type->has_humid == 1) {
                 printf("%s\t%d\thumidity\t%.2f %%\n", strdate, i, tempd[1]);
             }
-
-            if (!bsalir)
-                sleep(seconds);
         }
+        if (!bsalir)
+            sleep(seconds);
     } while (!bsalir);
 
     for (i = 0; i < numdev; i++) {
