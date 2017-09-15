@@ -45,7 +45,7 @@
 
 /* TEMPer type definition */
 
-typedef struct temper_type {
+typedef struct {
     const int vendor_id;
     const int product_id;
     const char product_name[256];
@@ -55,7 +55,7 @@ typedef struct temper_type {
     void (*decode_func)();
 } temper_type_t;
 
-typedef struct temper_device {
+typedef struct {
     libusb_device_handle *handle;
     temper_type_t *type;
 } temper_device_t;
