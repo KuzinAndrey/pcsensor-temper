@@ -367,7 +367,7 @@ int main(int argc, char **argv) {
                 printf("        -h help\n");
                 printf("        -v verbose\n");
                 printf("        -l[n] loop every 'n' seconds, default value is 5s\n");
-                printf("        -a scale:offset set values calibration TempC*scale+offset eg. 1.02:-0.55 \n");
+                printf("        -a scale:offset set values for calibration TempC*scale+offset eg. 1.02:-0.55 \n");
                 printf("        -c output in Celsius (default)\n");
                 printf("        -f output in Fahrenheit\n");
 
