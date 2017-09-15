@@ -107,17 +107,17 @@ void usb_detach(libusb_device_handle *lvr_winusb, int iInterface) {
     if(ret) {
         if(errno == ENODATA) {
             if(debug) {
-                printf("Device already detached\n");
+                fprintf(stderr, "Device already detached\n");
             }
         } else {
             if(debug) {
-                printf("Detach failed: %s[%d]\n", strerror(errno), errno);
-                printf("Continuing anyway\n");
+                fprintf(stderr, "Detach failed: %s[%d]\n", strerror(errno), errno);
+                fprintf(stderr, "Continuing anyway\n");
             }
         }
     } else {
         if(debug) {
-            printf("detach successful\n");
+            fprintf(stderr, "detach successful\n");
         }
     }
 }
@@ -173,7 +173,7 @@ int find_lvr_winusb(temper_device_t *devices) {
                 } 
 
                 if (debug) {
-                    printf("lvr_winusb with Bus:%03d Addr:%03d VendorID:%04x ProductID:%04x Manufacturer:%s Product:%s Serial:%s found.\n", 
+                    fprintf(stderr, "lvr_winusb with Bus:%03d Addr:%03d VendorID:%04x ProductID:%04x Manufacturer:%s Product:%s Serial:%s found.\n", 
                             bus, addr, desc.idVendor, desc.idProduct, descmanu, descprod, descseri);
                 }
 
@@ -240,8 +240,8 @@ void ini_control_transfer(libusb_device_handle *dev) {
     }
 
     if(debug) {
-        for (i=0;i<reqIntLen; i++) printf("%02x ",question[i] & 0xFF);
-        printf("\n");
+        for (i=0;i<reqIntLen; i++) fprintf(stderr, "%02x ",question[i] & 0xFF);
+        fprintf(stderr, "\n");
     }
 }
 
@@ -258,8 +258,8 @@ void control_transfer(libusb_device_handle *dev, const char *pquestion) {
     }
 
     if(debug) {
-        for (i=0;i<reqIntLen; i++) printf("%02x ",question[i]  & 0xFF);
-        printf("\n");
+        for (i=0;i<reqIntLen; i++) fprintf(stderr, "%02x ",question[i]  & 0xFF);
+        fprintf(stderr, "\n");
     }
 }
 
@@ -274,9 +274,9 @@ void interrupt_read(libusb_device_handle *dev, unsigned char *answer) {
     }
 
     if(debug) {
-        for (i=0;i<reqIntLen; i++) printf("%02x ",answer[i]  & 0xFF);
+        for (i=0;i<reqIntLen; i++) fprintf(stderr, "%02x ",answer[i]  & 0xFF);
 
-        printf("\n");
+        fprintf(stderr, "\n");
     }
 }
 
