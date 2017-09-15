@@ -41,15 +41,36 @@
 #include <signal.h>
 #include <libusb.h>
 
-#define VERSION "1.1.0"
+#define VERSION "1.2.0"
 
-#define VENDOR_ID  0x0c45
-#define PRODUCT_ID 0x7401
+/* TEMPer type definition */
+
+#define MAX_DEV 8
+#define TEMPER_TYPES 3
+
+struct temper_type {
+    const int vendor_id;
+    const int product_id;
+    const char product_name[256];
+    const int check_product_name; // if set, check product name in forward match
+    const int has_sensor; // number of temperature sensor
+    const int has_humid;  // flag for humidity sensor
+    void (*decode_func)();
+};
+
+void decode_answer_fm75();
+void decode_answer_sht1x();
+
+struct temper_type tempers[TEMPER_TYPES] = {
+    { 0x0c45, 0x7401, "TEMPer2",   1, 2, 0, decode_answer_fm75  }, // TEMPer2* eg. TEMPer2V1.3
+    { 0x0c45, 0x7401, "TEMPer1",   0, 1, 0, decode_answer_fm75  }, // other 0c45:7401 eg. TEMPerV1.4
+    { 0x0c45, 0x7402, "TEMPerHUM", 0, 1, 1, decode_answer_sht1x },
+};
+
+/* global variables */
 
 #define INTERFACE1 0x00
 #define INTERFACE2 0x01
-
-#define MAX_DEV 8
 
 const static int reqIntLen=8;
 const static int endpoint_Int_in=0x82; /* endpoint 0x81 address for IN */
@@ -65,6 +86,8 @@ static int seconds=5;
 static int formato=1; //Celsius
 
 static libusb_context *ctx = NULL;
+
+/* functions */
 
 void bad(const char *why) {
     fprintf(stderr,"Fatal error> %s\n",why);
@@ -93,8 +116,8 @@ void usb_detach(libusb_device_handle *lvr_winusb, int iInterface) {
     }
 }
 
-int find_lvr_winusb(libusb_device_handle **handles) {
-    int i, s, cnt, numdev;
+int find_lvr_winusb(libusb_device_handle **handles, int *types) {
+    int i, j, s, cnt, numdev;
     libusb_device **devs;
 
     //handle = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
@@ -113,24 +136,43 @@ int find_lvr_winusb(libusb_device_handle **handles) {
             continue;
         }
 
-        if (desc.idVendor == VENDOR_ID && desc.idProduct == PRODUCT_ID) {
-            if ((s = libusb_open(devs[i], &handles[numdev])) < 0) {
-                fprintf(stderr, "Could not open USB device: %d\n", s);
-                continue;
-            }
-
-            if(debug) {
+        for (j = 0; j < TEMPER_TYPES; j++) {
+            if (desc.idVendor == tempers[j].vendor_id && desc.idProduct == tempers[j].product_id) {
                 unsigned char bus, port, descmanu[256], descprod[256], descseri[256];
+
                 bus = libusb_get_bus_number(devs[i]);
                 port = libusb_get_port_number(devs[i]);
+
+                if ((s = libusb_open(devs[i], &handles[numdev])) < 0) {
+                    fprintf(stderr, "Could not open USB device: %d\n", s);
+                    continue;
+                }
+
                 libusb_get_string_descriptor_ascii(handles[numdev], desc.iManufacturer, descmanu, 256);
                 libusb_get_string_descriptor_ascii(handles[numdev], desc.iProduct, descprod, 256);
                 libusb_get_string_descriptor_ascii(handles[numdev], desc.iSerialNumber, descseri, 256);
-                printf("lvr_winusb with Bus:%03d Port:%03d VendorID:%04x ProductID:%04x Manufacturer:%s Product:%s Serial:%s found.\n", 
-                       bus, port, desc.idVendor, desc.idProduct, descmanu, descprod, descseri);
-            }
 
-            numdev++;
+                if (tempers[j].check_product_name) {
+                    if (strncmp((const char*)descprod, tempers[j].product_name, strlen(tempers[j].product_name)) == 0) {
+                        types[numdev] = j;
+                    }
+                    else {
+                        // vid and pid match, but product name unmatch
+                        libusb_close(handles[numdev]);
+                        continue; 
+                    }
+                }
+                else {
+                    types[numdev] = j;
+                } 
+
+                if (debug) {
+                    printf("lvr_winusb with Bus:%03d Port:%03d VendorID:%04x ProductID:%04x Manufacturer:%s Product:%s Serial:%s found.\n", 
+                            bus, port, desc.idVendor, desc.idProduct, descmanu, descprod, descseri);
+                }
+
+                numdev++;
+            }
         }
     }
 
@@ -139,8 +181,9 @@ int find_lvr_winusb(libusb_device_handle **handles) {
     return numdev;
 }
 
-int setup_libusb_access(libusb_device_handle **handles) {
-    int i,numdev;
+int setup_libusb_access(libusb_device_handle **handles, int *types) {
+    int i;
+    int numdev;
 
     libusb_init(&ctx);
 
@@ -150,7 +193,7 @@ int setup_libusb_access(libusb_device_handle **handles) {
         libusb_set_debug(ctx, 0); //LIBUSB_LOG_LEVEL_NONE
     }
 
-    if((numdev = find_lvr_winusb(handles)) < 1) {
+    if((numdev = find_lvr_winusb(handles, types)) < 1) {
         fprintf(stderr, "Couldn't find the USB device, Exiting: %d\n", numdev);
         return -1;
     }
@@ -237,18 +280,50 @@ void ex_program(int sig) {
     (void) signal(SIGINT, SIG_DFL);
 }
 
-int main( int argc, char **argv) {
+/* decode funcs */
+/* Thanks to https://github.com/edorfaus/TEMPered */
+
+void decode_answer_fm75(unsigned char *answer, float *tempd, float *calibration) {
+    int buf;
+
+    // temp C internal
+    buf = ((signed char)answer[2] << 8) + (answer[3] & 0xFF);
+    tempd[0] = buf * (125.0 / 32000.0);
+    tempd[0] = tempd[0] * calibration[0] + calibration[1];
+
+    // temp C external
+    buf = ((signed char)answer[4] << 8) + (answer[5] & 0xFF);
+    tempd[1] = buf * (125.0 / 32000.0);
+    tempd[1] = tempd[1] * calibration[0] + calibration[1];
+};
+
+void decode_answer_sht1x(unsigned char *answer, float *tempd, float *calibration){
+    int buf;
+
+    // temp C
+    buf = ((signed char)answer[2] << 8) + (answer[3] && 0xFF);
+    tempd[0] = -39.7 + 0.01 * buf;
+    tempd[0] = tempd[0] * calibration[0] + calibration[1];
+
+    // relative humidity
+    buf = ((signed char)answer[4] << 8) + (answer[5] && 0xFF);
+    tempd[1] = -2.0468 + 0.0367 * buf - 1.5955e-6 * buf * buf;
+    tempd[1] = ( tempd[0] - 25 ) * ( 0.01 + 0.00008 * tempd[1] ) + tempd[1];
+};
+
+int main(int argc, char **argv) {
     libusb_device_handle **handles;
+    int *types;
     int numdev,i;
     unsigned char *answer;
-    int temperature;
+    float tempd[2];
+    float calibration[2] = { 1, 0 }; //scale, offset
     char strdate[20];
-    float tempInC, tempExC;
     int c;
     struct tm *local;
     time_t t;
 
-    while ((c = getopt (argc, argv, "vcfl::h")) != -1)
+    while ((c = getopt(argc, argv, "vcfl::a:h")) != -1)
         switch (c)
         {
             case 'v':
@@ -262,7 +337,7 @@ int main( int argc, char **argv) {
                 break;
             case 'l':
                 if (optarg!=NULL){
-                    if (!sscanf(optarg,"%i",&seconds)==1) {
+                    if (!(sscanf(optarg,"%i",&seconds) == 1)) {
                         fprintf (stderr, "Error: '%s' is not numeric.\n", optarg);
                         exit(EXIT_FAILURE);
                     } else {
@@ -274,6 +349,12 @@ int main( int argc, char **argv) {
                     seconds = 5;
                     break;
                 }
+            case 'a':
+                if (!(sscanf(optarg,"%f:%f", &calibration[0], &calibration[1]) == 2)) {
+                    fprintf (stderr, "Error: '%s' is not numeric.\n", optarg);
+                    exit(EXIT_FAILURE);
+                }
+                break;
             case '?':
             case 'h':
                 printf("pcsensor version %s\n",VERSION);
@@ -281,6 +362,7 @@ int main( int argc, char **argv) {
                 printf("        -h help\n");
                 printf("        -v verbose\n");
                 printf("        -l[n] loop every 'n' seconds, default value is 5s\n");
+                printf("        -a scale:offset set values calibration TempC*scale+offset eg. 1.02:-0.55 \n");
                 printf("        -c output in Celsius (default)\n");
                 printf("        -f output in Fahrenheit\n");
 
@@ -299,7 +381,8 @@ int main( int argc, char **argv) {
     }
 
     handles = calloc(MAX_DEV, sizeof(libusb_device_handle*));
-    if ((numdev = setup_libusb_access(handles)) < 1) {
+    types = calloc(MAX_DEV, sizeof(int));
+    if ((numdev = setup_libusb_access(handles, types)) < 1) {
         exit(EXIT_FAILURE);
     }
 
@@ -326,12 +409,7 @@ int main( int argc, char **argv) {
         for (i = 0; i < numdev; i++) {
             control_transfer(handles[i], uTemperature);
             interrupt_read(handles[i], answer);
-
-            temperature = (answer[3] & 0xFF) + ((signed char)answer[2] << 8);
-            tempInC = temperature * (125.0 / 32000.0);
-
-            temperature = (answer[5] & 0xFF) + ((signed char)answer[4] << 8);
-            tempExC = temperature * (125.0 / 32000.0);
+            tempers[types[i]].decode_func(answer, tempd, calibration);
 
             t = time(NULL);
             local = localtime(&t);
@@ -344,12 +422,24 @@ int main( int argc, char **argv) {
                     local->tm_min,
                     local->tm_sec);
 
+            // print temperature
             if (formato==2) {
-                printf("%s\t%d\tinternal\t%.2f F\n", strdate, i, (9.0 / 5.0 * tempInC + 32.0));
-                printf("%s\t%d\texternal\t%.2f F\n", strdate, i, (9.0 / 5.0 * tempExC + 32.0));
+                // in Fahrenheit
+                printf("%s\t%d\tinternal\t%.2f F\n", strdate, i, (9.0 / 5.0 * tempd[0] + 32.0));
+                if (tempers[types[i]].has_sensor == 2) {
+                    printf("%s\t%d\texternal\t%.2f F\n", strdate, i, (9.0 / 5.0 * tempd[1] + 32.0));
+                }
             } else {
-                printf("%s\t%d\tinternal\t%.2f C\n", strdate, i, tempInC);
-                printf("%s\t%d\texternal\t%.2f C\n", strdate, i, tempExC);
+                // in Celsius
+                printf("%s\t%d\tinternal\t%.2f C\n", strdate, i, tempd[0]);
+                if (tempers[types[i]].has_sensor == 2) {
+                    printf("%s\t%d\texternal\t%.2f C\n", strdate, i, tempd[1]);
+                }
+            }
+
+            // print humidity
+            if (tempers[types[i]].has_humid == 1) {
+                printf("%s\t%d\thumidity\t%.2f %%\n", strdate, i, tempd[1]);
             }
 
             if (!bsalir)
