@@ -81,6 +81,7 @@
 . "${MUNIN_LIBDIR}/plugins/plugin.sh"
 
 set -o nounset
+set -o pipefail
 
 # path to pcsensor
 pcsensor=${pcsensor:-/usr/local/bin/pcsensor}
@@ -124,22 +125,20 @@ EOF
 }
 
 fetch() {
-    local value i
+    local i
 
     i=0
     while [ "$i" -le "$retry" ];
     do 
-        value=$( "$pcsensor" | awk '$2 == '"$device"' { print $4 }' )
+        "$pcsensor" | awk '$2 == '"$device"' { print $3".value", $4 }'
 
-        if [ -n "$value" ];then
+        if [ "$?" -eq 0 ];then
             break
         fi
 
         i=$(( i + 1 ))
         sleep 5
     done
-
-    echo "temperature.value ${value}"
 }
 
 # Main
