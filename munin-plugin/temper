@@ -10,7 +10,7 @@
 =head1 CONFIGURATION
 
   Install pcsensor command:
-    git clone https://github.com/shakemid/pcsensor-temper 
+    git clone https://github.com/shakemid/pcsensor-temper
     cd pcsensor-temper
     make
     cp pcsensor /usr/local/bin/
@@ -45,10 +45,10 @@
     update no
 
     temper.update no
+    temper.graph_title TEMPer
     temper.graph_category sensor
     temper.graph_args --base 1000
     temper.graph_scale no
-    temper.graph_title TEMPer
     temper.graph_vlabel Temp C
 
     temper.graph_order \
@@ -60,8 +60,20 @@
     temper.temperature_2.cdef temperature_2,0.97,*,1.22,-
     temper.temperature_3.cdef temperature_3,0.93,*,0.55,-
 
-  For more information about graph aggregation, 
+  For more information about graph aggregation,
   see http://guide.munin-monitoring.org/en/latest/example/graph/aggregate.html
+
+=head1 MEMO
+
+  Device types:
+    0c45:7401 with 1 sensor
+      temperature
+
+    0c45:7401 with 2 sensors
+      internal, external
+
+    0c45:7402
+      temperature, humidity
 
 =head1 AUTHOR
 
@@ -92,7 +104,7 @@ device=${device:-0}
 # need calibration
 #   example:
 #     env.cdef  temperature,1.0287,*,0.85,-
-cdef=${cdef:-temperature} 
+cdef=${cdef:-}
 
 retry=${retry:-1}
 
@@ -106,33 +118,35 @@ graph_title TEMPer
 graph_category sensors
 graph_scale no
 graph_vlabel Temp C
-graph_args --base 1000 
+graph_args --base 1000
 EOF
 
     "$pcsensor" | awk '$2 == '"$device"' { print $3 }' |
     while read -r label
     do
         echo "${label}.label ${label}"
-        echo "${label}.cdef ${cdef}"
 
         if [ "$label" = 'humidity' ]; then
             echo "${label}.draw AREA"
             echo "graph_order humidity temperature"
         else
             echo "${label}.draw LINE"
+            if [ -n "$cdef" ]; then
+                echo "${label}.cdef ${cdef}"
+            fi
         fi
     done
 }
 
 fetch() {
-    local i
+    local i ret
 
     i=0
     while [ "$i" -le "$retry" ];
-    do 
+    do
         "$pcsensor" | awk '$2 == '"$device"' { print $3".value", $4 }'
-
-        if [ "$?" -eq 0 ];then
+        ret=$?
+        if [ "$ret" -eq 0 ];then
             break
         fi
 
