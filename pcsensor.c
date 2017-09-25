@@ -307,13 +307,11 @@ void decode_answer_fm75(unsigned char *answer, float *tempd, float *calibration)
 
     // temp C internal
     buf = ((signed char)answer[2] << 8) + (answer[3] & 0xFF);
-    if (debug) fprintf(stderr, "%d\n", buf);
     tempd[0] = buf * (125.0 / 32000.0);
     tempd[0] = tempd[0] * calibration[0] + calibration[1];
 
     // temp C external
     buf = ((signed char)answer[4] << 8) + (answer[5] & 0xFF);
-    if (debug) fprintf(stderr, "%d\n", buf);
     tempd[1] = buf * (125.0 / 32000.0);
     tempd[1] = tempd[1] * calibration[0] + calibration[1];
 };
@@ -323,13 +321,11 @@ void decode_answer_sht1x(unsigned char *answer, float *tempd, float *calibration
 
     // temp C
     buf = ((signed char)answer[2] << 8) + (answer[3] & 0xFF);
-    if (debug) fprintf(stderr, "%d\n", buf);
     tempd[0] = -39.7 + 0.01 * buf;
     tempd[0] = tempd[0] * calibration[0] + calibration[1];
 
     // relative humidity
     buf = ((signed char)answer[4] << 8) + (answer[5] & 0xFF);
-    if (debug) fprintf(stderr, "%d\n", buf);
     tempd[1] = -2.0468 + 0.0367 * buf - 1.5955e-6 * buf * buf;
     tempd[1] = ( tempd[0] - 25 ) * ( 0.01 + 0.00008 * buf ) + tempd[1];
     if (tempd[1] <  0) tempd[1] = 0;
