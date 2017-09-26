@@ -71,6 +71,9 @@ temper_type_t tempers[TEMPER_TYPES] = {
     { 0x0c45, 0x7402, "TEMPerHUM", 0, 1, 1, decode_answer_sht1x },
 };
 
+/* memo: TEMPer2 cannot be distinguished with VID:PID,
+   thus product name (like TEMPer2V1.3) should be checked. */
+
 /* global variables */
 
 #define MAX_DEV 8
