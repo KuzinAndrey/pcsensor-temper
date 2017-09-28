@@ -16,9 +16,9 @@
     cp pcsensor /usr/local/bin/
 
   Make symlink:
-    cp munin-plugin/temper /path/to/munin/lib/plugins/
-    cd /path/to/munin/etc/plugins/
-    ln -s /path/to/munin/lib/plugins/temper .
+    cp munin-plugin/temper /opt/munin/lib/plugins/
+    cd /opt/munin/etc/plugins/
+    ln -s /opt/munin/lib/plugins/temper .
 
 =head1 ENVIRONMENT VARIABLES
 
@@ -142,11 +142,11 @@ fetch() {
     local i ret
 
     i=0
-    while [ "$i" -le "$retry" ];
+    while [ "$i" -le "$retry" ]
     do
         "$pcsensor" | awk '$2 == '"$device"' { print $3".value", $4 }'
         ret=$?
-        if [ "$ret" -eq 0 ];then
+        if [ "$ret" -eq 0 ]; then
             break
         fi
 

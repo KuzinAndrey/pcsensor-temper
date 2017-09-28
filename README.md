@@ -1,16 +1,29 @@
-PCSensor / TEMPer2 driver for Linux/Solaris 
+PCSensor / TEMPer driver for Linux/Solaris 
 ====
-
-![TEMPer](images/New_TEMPer_6.jpg)
 
 A CLI tool for PCsensor TEMPer USB thermometer. http://www.pcsensor.com/
 
-This is based on PCSensor v. 1.0.1 by Juan Carlos Perez, introduced at https://relavak.wordpress.com/2009/10/17/temper-temperature-sensor-linux-driver/
+This is based on PCSensor v1.0.1 by Juan Carlos Perez, introduced at https://relavak.wordpress.com/2009/10/17/temper-temperature-sensor-linux-driver/
 
-Support device 0c45:7401 known as Gold TEMPer. (image above)
+Supported devices:
+- 0c45:7401 with 1 temperature sensor (Gold TEMPer)
+  - Tested with TEMPerV1.4
+
+![Gold TEMPer](images/goldtemper.jpg)
+
+- 0c45:7401 with 2 temperature sensors (TEMPer2)
+  - Tested with TEMPer2_M12_V1.3
+
+![TEMPer2](images/temper2.jpg)
+
+- 0c45:7402 with temperature and humidity sensors (TEMPerHUM)
+  - Tested with TEMPer1F_H1_V1.4
+
+![TEMPerHUM](images/temperhum.jpg)
 
 I have worked on, 
 - Change libusb-0.1 -> libusb-1.0 (to be able to build on Solaris)
+- Support TEMperHUM
 - Support multiple devices
 - Add Munin plugin http://munin-monitoring.org/
 - Some code cleanups, fix indents, typos, ...
@@ -35,16 +48,21 @@ $ make
 # Usage
 ```
 $ sudo ./pcsensor
-2017-08-31T19:00:35  0  internal  27.38
-2017-08-31T19:00:35  0  external  101.45
-2017-08-31T19:00:35  1  internal  27.31
-2017-08-31T19:00:35  1  external  101.45
+2017-09-26T20:49:24     0       temperature     31.69 C
+2017-09-26T20:49:24     1       temperature     32.12 C
+2017-09-26T20:49:24     2       temperature     33.44 C
+2017-09-26T20:49:24     2       humidity        62.63 %
 ...
 ```
 
 libusb_detach_kernel_driver does not seem to work on Solaris. Thus, it looks necessary to unload hid driver manually.
 Are there any better solutions? (See pcsensor.sh)
 
+# Example
+
+Munin graph sample
+
+![Munin](images/munin-temper-day.png)
 
 Original document below
 ====
