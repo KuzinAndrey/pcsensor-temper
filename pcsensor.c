@@ -210,6 +210,7 @@ int setup_libusb_access(temper_device_t *devices) {
     for (i = 0; i < numdev; i++) {
         usb_detach(devices[i].handle, INTERFACE1);
         usb_detach(devices[i].handle, INTERFACE2);
+        libusb_reset_device(devices[i].handle);
 
         if (libusb_set_configuration(devices[i].handle, 0x01) < 0) {
             fprintf(stderr, "Could not set configuration 1\n");
