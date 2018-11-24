@@ -58,6 +58,12 @@ $ sudo ./pcsensor
 libusb_detach_kernel_driver does not seem to work on Solaris. Thus, it looks necessary to unload hid driver manually.
 Are there any better solutions? (See pcsensor.sh)
 
+(Added on 2018-11-24)
+It has been tested on Solaris 11.3 and libusb-1.0.20, and looked working fine.
+On Solaris 11.4, libusb-1.0.21 was introduced. But, pcsensor doesn't seem to work with 1.0.21.
+I found it can work with libusb-1.0.21-rc2, but cannot work with libusb-1.0.21-rc3 or above.
+If you would like to use it on Solaris 11.4, get libusb-1.0.21-rc2 from github and install it.
+
 # Example
 
 Munin graph sample
