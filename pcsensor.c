@@ -346,8 +346,11 @@ int main(int argc, char **argv) {
     int c;
     struct tm *local;
     time_t t;
+    FILE *fout = NULL;
+    char *fout_name = NULL;
+    int become_daemon = 0;
 
-    while ((c = getopt(argc, argv, "vcfl::a:h")) != -1)
+    while ((c = getopt(argc, argv, "vcfdl::a:o:h")) != -1)
         switch (c)
         {
             case 'v':
@@ -358,6 +361,9 @@ int main(int argc, char **argv) {
                 break;
             case 'f':
                 formato=2; //Fahrenheit
+                break;
+            case 'd':
+                become_daemon = 1;
                 break;
             case 'l':
                 if (optarg!=NULL){
@@ -379,6 +385,20 @@ int main(int argc, char **argv) {
                     exit(EXIT_FAILURE);
                 }
                 break;
+            case 'o':
+                if (optarg) {
+                    fout_name = strdup(optarg);
+                    if (!fout_name) {
+                        fprintf (stderr, "Error: can't strdup file name '%s'.\n", optarg);
+                        exit(EXIT_FAILURE);
+                    }
+                    fout = fopen(fout_name,"w");
+                    if (!fout) {
+                        fprintf (stderr, "Error: can't open file '%s'.\n", optarg);
+                        exit(EXIT_FAILURE);
+                    } else fclose(fout);
+                }
+                break;
             case '?':
             case 'h':
                 printf("pcsensor version %s\n",VERSION);
@@ -389,6 +409,8 @@ int main(int argc, char **argv) {
                 printf("        -a scale:offset set values for calibration TempC*scale+offset eg. 1.02:-0.55 \n");
                 printf("        -c output in Celsius (default)\n");
                 printf("        -f output in Fahrenheit\n");
+                printf("        -o filename - output in file\n");
+                printf("        -d daemonize to background\n");
 
                 exit(EXIT_FAILURE);
             default:
@@ -402,6 +424,14 @@ int main(int argc, char **argv) {
     if (optind < argc) {
         fprintf(stderr, "Non-option ARGV-elements, try -h for help.\n");
         exit(EXIT_FAILURE);
+    }
+
+    // try to daemonize
+    if (become_daemon) {
+        if (daemon(1,1) == -1) {
+            fprintf(stderr, "can't daemonize\n");
+            exit(EXIT_FAILURE);
+        };
     }
 
     devices = calloc(MAX_DEV, sizeof(temper_device_t));
@@ -429,6 +459,14 @@ int main(int argc, char **argv) {
     */
 
     do {
+        if (fout_name) {
+            fout = fopen(fout_name,"w");
+            if (!fout) {
+                 fprintf(stderr, "can't open file %s - use stdout\n",fout_name);
+                 fout = stdout;
+            };
+        } else fout = stdout;
+
         for (i = 0; i < numdev; i++) {
             // get localtime
             t = time(NULL);
@@ -447,7 +485,7 @@ int main(int argc, char **argv) {
             devices[i].type->decode_func(answer, tempd, calibration);
 
             // print temperature
-            printf("%s\t%d\t%s\t%.2f %s\n", 
+            fprintf(fout,"%s\t%d\t%s\t%.2f %s\n", 
                    strdate, 
                    i, 
                    devices[i].type->has_sensor == 2 ? "internal" : "temperature",
@@ -455,7 +493,7 @@ int main(int argc, char **argv) {
                    formato == 2 ? "F" : "C");
 
             if (devices[i].type->has_sensor == 2) {
-                printf("%s\t%d\texternal\t%.2f %s\n", 
+                fprintf(fout,"%s\t%d\texternal\t%.2f %s\n", 
                        strdate, 
                        i, 
                        formato == 2 ? 9.0 / 5.0 * tempd[1] + 32.0 : tempd[1],
@@ -464,9 +502,12 @@ int main(int argc, char **argv) {
 
             // print humidity
             if (devices[i].type->has_humid == 1) {
-                printf("%s\t%d\thumidity\t%.2f %%\n", strdate, i, tempd[1]);
+                fprintf(fout,"%s\t%d\thumidity\t%.2f %%\n", strdate, i, tempd[1]);
             }
         }
+
+        if (fout_name && fout) fclose(fout);
+
         if (!bsalir)
             sleep(seconds);
     } while (!bsalir);
